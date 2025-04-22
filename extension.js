@@ -1,4 +1,3 @@
-// The module 'vscode' contains the VS Code extensibility API
 const vscode = require('vscode');
 
 /**
@@ -9,11 +8,11 @@ function activate(context) {
 
 	const disposable = vscode.commands.registerCommand('collab-code.helloWorld', function () {
 		const panel = vscode.window.createWebviewPanel(
-			'collabChat', // Identifies the type of the webview
-			'CollabCode Chat', // Title of the panel
-			vscode.ViewColumn.Two, // Editor column to show the panel in
+			'collabChat',
+			'CollabCode Chat',
+			vscode.ViewColumn.Two,
 			{
-				enableScripts: true // Enables JavaScript in the webview
+				enableScripts: true
 			}
 		);
 
@@ -22,7 +21,17 @@ function activate(context) {
 		panel.webview.onDidReceiveMessage(
 			message => {
 				if (message.type === 'chat') {
-					vscode.window.showInformationMessage(`Chat says: ${message.text}`);
+					const timestamp = new Date().toLocaleTimeString([], {
+						hour: '2-digit',
+						minute: '2-digit'
+					});
+
+					panel.webview.postMessage({
+						type: 'chat',
+						text: message.text,
+						timestamp: timestamp,
+						user: 'You'
+					});
 				} else if (message.type === 'reaction') {
 					vscode.window.showInformationMessage(`You reacted with ${message.reaction}`);
 				}
@@ -76,16 +85,45 @@ function getWebviewContent() {
 					margin-bottom: 14px;
 				}
 
-				.message {
-					background-color: #2d2d2d;
-					border-radius: 6px;
-					padding: 8px 10px;
-					margin: 8px 0;
-					box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+				.message.user {
+					display: flex;
+					justify-content: flex-end;
+					padding-right: 12px;
+					margin-bottom: 12px;
 				}
 
-				.user {
-					text-align: right;
+				.bubble {
+					background-color: #2d2d2d;
+					border-radius: 10px;
+					padding: 10px;
+					max-width: 75%;
+					box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+				}
+
+				.bubble-header {
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					margin-bottom: 4px;
+					color: #d4d4d4;
+					font-size: 0.85em;
+				}
+
+				.bubble-user {
+					font-weight: bold;
+				}
+
+				.bubble-time {
+					font-size: 0.75em;
+					color: gray;
+					margin-left: 10px;
+				}
+
+				.bubble-text {
+					font-size: 1em;
+					margin-bottom: 6px;
+					word-wrap: break-word;
+					text-align: left;
 				}
 
 				.reactions {
@@ -165,26 +203,37 @@ function getWebviewContent() {
 
 				function sendMessage() {
 					const input = document.getElementById('message');
-					const chat = document.getElementById('chat');
 
 					if (input.value.trim() !== '') {
+						vscode.postMessage({ type: 'chat', text: input.value });
+						input.value = '';
+					}
+				}
+
+				window.addEventListener('message', event => {
+					const message = event.data;
+					if (message.type === 'chat') {
+						const chat = document.getElementById('chat');
 						const messageHTML = \`
 							<div class="message user">
-								<b>You:</b> \${input.value}
-								<div class="reactions">
-									<span class="reaction">👍</span>
-									<span class="reaction">❤️</span>
-									<span class="reaction">😂</span>
+								<div class="bubble"> 
+									<div class="bubble-header"> 
+										<span class="bubble-user">\${message.user}</span>
+										<span class="bubble-time">\${message.timestamp}</span>
+									</div>
+									<div class="bubble-text">\${message.text}</div>
+									<div class="reactions">
+										<span class="reaction">👍</span>
+										<span class="reaction">❤️</span>
+										<span class="reaction">😂</span>
+									</div>
 								</div>
 							</div>
 						\`;
 						chat.innerHTML += messageHTML;
 						chat.scrollTop = chat.scrollHeight;
-
-						vscode.postMessage({ type: 'chat', text: input.value });
-						input.value = '';
 					}
-				}
+				});
 
 				document.addEventListener('click', function (e) {
 					if (e.target.classList.contains('reaction')) {
