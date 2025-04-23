@@ -1,4 +1,7 @@
 const vscode = require('vscode');
+const CollaborativeEditor = require('./collaborativeEditor');
+
+let collaborativeEditor;
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -6,7 +9,10 @@ const vscode = require('vscode');
 function activate(context) {
 	console.log('Congratulations, your extension "collab-code" is now active!');
 
-	const disposable = vscode.commands.registerCommand('collab-code.helloWorld', function () {
+	collaborativeEditor = new CollaborativeEditor(context);
+	collaborativeEditor.initialize();
+
+	let disposable = vscode.commands.registerCommand('collab-code.helloWorld', function () {
 		const panel = vscode.window.createWebviewPanel(
 			'collabChat',
 			'CollabCode Chat',
@@ -248,7 +254,11 @@ function getWebviewContent() {
 	`;
 }
 
-function deactivate() {}
+function deactivate() {
+	if (collaborativeEditor) {
+		collaborativeEditor.dispose();
+	}
+}
 
 module.exports = {
 	activate,
