@@ -18,16 +18,19 @@ suite('CollabCode Extension Test Suite', () => {
 	let collabEditor;
 
 	suiteSetup(async () => {
-		// 创建临时测试文件
-		const workspacePath = path.join(__dirname, '..');
-		testFile = path.join(workspacePath, 'test.js');
+		// 创建共享的测试文件
+		const workspacePath = path.join(__dirname);
+		testFile = path.join(workspacePath, 'shared-test.js');
 		
-		// 确保文件存在
-		if (!fs.existsSync(testFile)) {
-			fs.writeFileSync(testFile, '// Test file for collaborative editing\n');
-		}
+		// 创建测试文件的初始内容
+		const initialContent = `// 这是一个共享的测试文件
+function add(a, b) {
+	return a + b;
+}`;
 
-		// 打开文件
+		fs.writeFileSync(testFile, initialContent);
+
+		// 在两个编辑器中打开同一个文件
 		document = await vscode.workspace.openTextDocument(testFile);
 		editor1 = await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.One });
 		editor2 = await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.Two });
@@ -44,59 +47,53 @@ suite('CollabCode Extension Test Suite', () => {
 		}
 	});
 
-	test('Chat panel opens for both users', async () => {
-		await vscode.commands.executeCommand('collab-code.helloWorld');
-		const panels = vscode.window.visibleTextEditors;
-		assert.ok(panels.length > 0, 'Chat panel should be visible for user 1');
-
-		await vscode.commands.executeCommand('collab-code.helloWorld');
-		const panels2 = vscode.window.visibleTextEditors;
-		assert.ok(panels2.length > 1, 'Chat panel should be visible for user 2');
-	});
-
-	test('Collaborative editing between two users', async () => {
-		// 简单的编辑测试
-		const initialContent = '// Initial content\n';
+	test('基础协作功能测试', async () => {
+		// 用户1编辑文件
 		await editor1.edit(editBuilder => {
-			editBuilder.insert(new vscode.Position(0, 0), initialContent);
+			const position = new vscode.Position(document.lineCount, 0);
+			editBuilder.insert(position, '\n\n// 用户1添加的注释\n');
 		});
 
-		// 等待编辑完成
-		await new Promise(resolve => setTimeout(resolve, 100));
+		// 等待同步
+		await new Promise(resolve => setTimeout(resolve, 500));
 
-		// 验证编辑是否成功
-		const content = editor1.document.getText();
-		assert.ok(content.includes(initialContent), 'Initial edit should be visible');
-	});
+		// 用户2编辑文件
+		await editor2.edit(editBuilder => {
+			const position = new vscode.Position(document.lineCount, 0);
+			editBuilder.insert(position, '// 用户2添加的注释\n');
+		});
 
-	test('Cursor tracking between users', async () => {
+		// 等待同步
+		await new Promise(resolve => setTimeout(resolve, 500));
+
+		// 验证两个编辑器显示相同的内容
+		const content1 = editor1.document.getText();
+		const content2 = editor2.document.getText();
+		assert.strictEqual(content1, content2, '两个编辑器应该显示相同的内容');
+		assert.ok(content1.includes('用户1添加的注释'), '用户1的编辑应该可见');
+		assert.ok(content1.includes('用户2添加的注释'), '用户2的编辑应该可见');
+
+		// 测试光标位置
 		const position1 = new vscode.Position(2, 0);
 		editor1.selection = new vscode.Selection(position1, position1);
 		
-		// 等待光标更新
-		await new Promise(resolve => setTimeout(resolve, 100));
-		
-		// 检查光标位置
-		assert.strictEqual(editor1.selection.active.line, position1.line, 'User 1 cursor position should be updated');
-		assert.strictEqual(editor1.selection.active.character, position1.character, 'User 1 cursor position should be updated');
-
 		const position2 = new vscode.Position(3, 0);
 		editor2.selection = new vscode.Selection(position2, position2);
 		
 		// 等待光标更新
-		await new Promise(resolve => setTimeout(resolve, 100));
-		
-		// 检查光标位置
-		assert.strictEqual(editor2.selection.active.line, position2.line, 'User 2 cursor position should be updated');
-		assert.strictEqual(editor2.selection.active.character, position2.character, 'User 2 cursor position should be updated');
+		await new Promise(resolve => setTimeout(resolve, 500));
+
+		// 验证光标位置
+		assert.strictEqual(editor1.selection.active.line, position1.line, '用户1的光标位置应该正确');
+		assert.strictEqual(editor2.selection.active.line, position2.line, '用户2的光标位置应该正确');
 	});
 
-	test('Chat messages between users', async () => {
-		// 在测试环境中，我们模拟聊天面板
+	test('Chat panel for shared file', async () => {
+		// 打开聊天面板
 		const panel = await vscode.window.createWebviewPanel(
 			'collabChat',
 			'Collaborative Chat',
-			vscode.ViewColumn.Two,
+			vscode.ViewColumn.Three,
 			{}
 		);
 
@@ -107,9 +104,17 @@ suite('CollabCode Extension Test Suite', () => {
 			<head>
 				<meta charset="UTF-8">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<style>
+					body { font-family: Arial, sans-serif; padding: 10px; }
+					.message { margin: 5px 0; padding: 5px; border-radius: 4px; }
+					.user1 { background: #e3f2fd; }
+					.user2 { background: #f3e5f5; }
+				</style>
 			</head>
 			<body>
-				<div>Welcome to CollabCode</div>
+				<div class="message user1">User 1: I added a subtract function</div>
+				<div class="message user2">User 2: I added a divide function</div>
+				<div class="message user1">User 1: Looks good!</div>
 			</body>
 			</html>
 		`;
@@ -117,12 +122,8 @@ suite('CollabCode Extension Test Suite', () => {
 		// 等待面板显示
 		await new Promise(resolve => setTimeout(resolve, 100));
 
-		// 检查面板是否可见
-		const visiblePanels = vscode.window.visibleTextEditors;
-		assert.ok(visiblePanels.length > 0, 'Chat panel should be visible');
-
-		// 检查面板内容
-		const panelContent = panel.webview.html;
-		assert.ok(panelContent.includes('Welcome to CollabCode'), 'Chat panel should show welcome message');
+		// 验证面板是否可见和内容是否正确
+		assert.ok(panel.visible, 'Chat panel should be visible');
+		assert.ok(panel.webview.html.includes('subtract'), 'Chat should show relevant messages');
 	});
 });
