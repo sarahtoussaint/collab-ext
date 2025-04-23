@@ -14,10 +14,12 @@
   ],
   "main": "./extension.js",
   "contributes": {
-    "commands": [{
-      "command": "collab-code.helloWorld",
-      "title": "Open CollabCode Chat"
-    }],
+    "commands": [
+      {
+        "command": "collab-code.helloWorld",
+        "title": "Open CollabCode Chat"
+      }
+    ],
     "configuration": {
       "title": "CollabCode",
       "properties": {
@@ -41,12 +43,13 @@
     "start-server": "node server.js"
   },
   "devDependencies": {
-    "@types/vscode": "^1.99.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
-    "eslint": "^9.23.0",
+    "@types/vscode": "^1.99.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.23.0",
+    "ip": "^1.1.9",
     "ws": "^8.16.0"
   }
 }
