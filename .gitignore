@@ -1,0 +1,58 @@
+# VS Code specific files
+.vscode-test/
+.vscode-test/**/*
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Dependencies
+node_modules/
+node_modules/**/*
+package-lock.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment
+.env
+.env.test
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Cache directories
+.npm
+.eslintcache
+.node_repl_history
+
+# Build output
+dist/
+out/
+*.vsix
+
+# OS specific files
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Editor directories and files
+.idea/
+*.swp
+*.swo
+*.swn
+*.bak

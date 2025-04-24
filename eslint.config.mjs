@@ -1,25 +1,23 @@
 import globals from "globals";
 
-export default [{
-    files: ["**/*.js"],
-    languageOptions: {
-        globals: {
-            ...globals.commonjs,
-            ...globals.node,
-            ...globals.mocha,
+export default [
+    {
+        files: ['**/*.js'],
+        languageOptions: {
+            globals: {
+                console: 'readonly',
+                require: 'readonly',
+                module: 'readonly',
+                process: 'readonly',
+                __dirname: 'readonly',
+                Buffer: 'readonly'
+            },
+            ecmaVersion: 2022,
+            sourceType: 'commonjs'
         },
-
-        ecmaVersion: 2022,
-        sourceType: "module",
-    },
-
-    rules: {
-        "no-const-assign": "warn",
-        "no-this-before-super": "warn",
-        "no-undef": "warn",
-        "no-unreachable": "warn",
-        "no-unused-vars": "warn",
-        "constructor-super": "warn",
-        "valid-typeof": "warn",
-    },
-}];
+        rules: {
+            'no-unused-vars': 'warn',
+            'no-undef': 'error'
+        }
+    }
+];
