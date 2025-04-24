@@ -10,9 +10,11 @@ function activate(context) {
 	console.log('Congratulations, your extension "collab-code" is now active!');
 
 	collaborativeEditor = new CollaborativeEditor();
-	collaborativeEditor.initialize();
+	collaborativeEditor.initialize().catch(error => {
+		console.error('Failed to initialize collaborative editor:', error);
+	});
 
-	const disposable = vscode.commands.registerCommand('collab-code.helloWorld', function () {
+	const chatCommand = vscode.commands.registerCommand('collab-code.helloWorld', function () {
 		const panel = vscode.window.createWebviewPanel(
 			'collabChat',
 			'CollabCode Chat',
@@ -38,6 +40,10 @@ function activate(context) {
 						timestamp: timestamp,
 						user: 'You'
 					});
+					
+					if (collaborativeEditor) {
+						collaborativeEditor.sendChatMessage(message.text);
+					}
 				} else if (message.type === 'reaction') {
 					vscode.window.showInformationMessage(`You reacted with ${message.reaction}`);
 				}
@@ -46,8 +52,36 @@ function activate(context) {
 			context.subscriptions
 		);
 	});
+	
+	const connectCommand = vscode.commands.registerCommand('collab-code.connect', async function () {
+		const serverUrl = await vscode.window.showInputBox({
+			placeHolder: 'Enter server URL (e.g., ws://192.168.1.5:8080)',
+			prompt: 'Enter the WebSocket server URL to connect to'
+		});
+		
+		if (serverUrl) {
+			await vscode.workspace.getConfiguration('collab-code').update('serverUrl', serverUrl, true);
+			if (collaborativeEditor) {
+				collaborativeEditor.dispose();
+			}
+			collaborativeEditor = new CollaborativeEditor();
+			collaborativeEditor.initialize().catch(error => {
+				console.error('Failed to initialize collaborative editor:', error);
+			});
+		}
+	});
+	
+	const startServerCommand = vscode.commands.registerCommand('collab-code.startServer', function () {
+		const terminal = vscode.window.createTerminal('CollabCode Server');
+		terminal.sendText('node server.js');
+		terminal.show();
+		
+		const ip = require('ip');
+		const localIP = ip.address();
+		vscode.window.showInformationMessage(`Server started. Share this address with collaborators: ws://${localIP}:8080`);
+	});
 
-	context.subscriptions.push(disposable);
+	context.subscriptions.push(chatCommand, connectCommand, startServerCommand);
 }
 
 function getWebviewContent() {
@@ -215,6 +249,11 @@ function getWebviewContent() {
 						input.value = '';
 					}
 				}
+				document.getElementById('message').addEventListener('keydown', function(event) {
+					if (event.key === 'Enter') {
+						sendMessage();
+					}
+				});
 
 				window.addEventListener('message', event => {
 					const message = event.data;

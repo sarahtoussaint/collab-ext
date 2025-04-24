@@ -1,5 +1,6 @@
 const vscode = require('vscode');
 const WebSocket = require('ws');
+const ip = require('ip');
 
 class CollaborativeEditor {
     constructor() {
@@ -91,24 +92,61 @@ class CollaborativeEditor {
         this.cursorDecorations.set('local', decorationType);
     }
 
-    initialize() {
+    async initialize() {
         console.log('CollaborativeEditor: Initialization started');
-        return this.connectWebSocket();
+        
+        const config = vscode.workspace.getConfiguration('collab-code');
+        let serverUrl = config.get('serverUrl');
+        
+        if (!serverUrl) {
+            const options = ['Start a new server', 'Connect to existing server'];
+            const choice = await vscode.window.showQuickPick(options, {
+                placeHolder: 'Choose collaboration mode'
+            });
+            
+            if (choice === options[0]) {
+                this.startLocalServer();
+                serverUrl = `ws://localhost:8080`;
+            } else if (choice === options[1]) {
+                serverUrl = await vscode.window.showInputBox({
+                    placeHolder: 'Enter server URL (e.g., ws://192.168.1.5:8080)',
+                    prompt: 'Enter the WebSocket server URL to connect to'
+                });
+                
+                if (!serverUrl) {
+                    vscode.window.showWarningMessage('No server URL provided. Collaboration disabled.');
+                    return Promise.reject('No server URL provided');
+                }
+            } else {
+                return Promise.reject('Operation cancelled');
+            }
+            
+            await vscode.workspace.getConfiguration('collab-code').update('serverUrl', serverUrl, true);
+        }
+        
+        return this.connectWebSocket(serverUrl);
     }
 
-    connectWebSocket() {
-        console.log('CollaborativeEditor: Attempting to connect WebSocket');
+    startLocalServer() {
+        const terminal = vscode.window.createTerminal('CollabCode Server');
+        terminal.sendText('node server.js');
+        terminal.show();
+        
+        const localIP = ip.address();
+        vscode.window.showInformationMessage(`Server started. Share this address with collaborators: ws://${localIP}:8080`);
+    }
+
+    connectWebSocket(serverUrl) {
+        console.log('CollaborativeEditor: Attempting to connect WebSocket to', serverUrl);
         return new Promise((resolve, reject) => {
             try {
                 console.log('CollaborativeEditor: Creating WebSocket connection...');
-                const config = vscode.workspace.getConfiguration('collab-code');
-                const serverUrl = config.get('serverUrl') || 'ws://localhost:8080';
                 this.ws = new WebSocket(serverUrl);
                 
                 this.ws.onopen = () => {
                     console.log('CollaborativeEditor: WebSocket connection successful!');
-                    vscode.window.showInformationMessage('CollabCode: WebSocket connection successful!');
-                    this.updateStatusBar('Connected to server');
+                    vscode.window.showInformationMessage(`CollabCode: Connected to ${serverUrl}`);
+                    this.updateStatusBar(`Connected to ${serverUrl}`);
                     
                     this.ws.send(JSON.stringify({
                         type: 'userInfo',
@@ -121,8 +159,20 @@ class CollaborativeEditor {
 
                 this.ws.onerror = (error) => {
                     console.error('CollaborativeEditor: WebSocket error:', error);
-                    vscode.window.showErrorMessage('CollabCode: WebSocket connection failed!');
+                    vscode.window.showErrorMessage(`CollabCode: WebSocket connection failed to ${serverUrl}`);
                     this.updateStatusBar('Connection failed');
+                    
+                    vscode.window.showQuickPick(['Try another server', 'Cancel'], {
+                        placeHolder: 'Connection failed. What would you like to do?'
+                    }).then(choice => {
+                        if (choice === 'Try another server') {
+                            vscode.workspace.getConfiguration('collab-code').update('serverUrl', '', true)
+                            .then(() => {
+                                this.initialize();
+                            });
+                        }
+                    });
+                    
                     reject(error);
                 };
 

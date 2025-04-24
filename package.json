@@ -19,6 +19,14 @@
       {
         "command": "collab-code.helloWorld",
         "title": "Open CollabCode Chat"
+      },
+      {
+        "command": "collab-code.connect",
+        "title": "Connect to CollabCode Server"
+      },
+      {
+        "command": "collab-code.startServer",
+        "title": "Start CollabCode Server"
       }
     ],
     "configuration": {
@@ -26,7 +34,7 @@
       "properties": {
         "collab-code.serverUrl": {
           "type": "string",
-          "default": "ws://localhost:8080",
+          "default": "",
           "description": "WebSocket server URL for collaborative editing"
         }
       }
