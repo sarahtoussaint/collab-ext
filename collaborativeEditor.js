@@ -94,7 +94,7 @@ class CollaborativeEditor {
         return new Promise((resolve, reject) => {
             try {
                 console.log('CollaborativeEditor: Creating WebSocket connection...');
-                this.ws = new WebSocket('ws://localhost:8080');
+                this.ws = new WebSocket('ws://172.16.0.63:8080');
                 
                 this.ws.onopen = () => {
                     console.log('CollaborativeEditor: WebSocket connection successful!');
@@ -225,8 +225,10 @@ class CollaborativeEditor {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify({
                 type: 'cursor',
-                line: position.line,
-                character: position.character,
+                position: {
+                    line: position.line,
+                    character: position.character
+                },
                 username: this.username || 'Anonymous'
             }));
         }
