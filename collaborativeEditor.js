@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const WebSocket = require('ws');
 
 class CollaborativeEditor {
     constructor() {
@@ -118,7 +119,7 @@ class CollaborativeEditor {
 
                 this.ws.onmessage = (event) => {
                     console.log('CollaborativeEditor: Message received:', event.data);
-                    this.handleMessage(JSON.parse(event.data));
+                    this.handleMessage(event.data);
                 };
 
                 this.ws.onclose = () => {
@@ -137,19 +138,21 @@ class CollaborativeEditor {
 
     handleMessage(data) {
         console.log('Processing received message:', data);
-        if (data.senderId === this.clientId) {
+        const message = typeof data === 'string' ? JSON.parse(data) : data;
+        
+        if (message.senderId === this.clientId) {
             return;
         }
 
-        switch (data.type) {
+        switch (message.type) {
             case 'cursor':
-                this.showRemoteCursor(data);
+                this.showRemoteCursor(message);
                 break;
             case 'edit':
-                this.applyRemoteEdit(data);
+                this.applyRemoteEdit(message);
                 break;
             case 'userCount':
-                this.updateStatusBar(`Online users: ${data.count}`);
+                this.updateStatusBar(`Online users: ${message.count}`);
                 break;
         }
     }
@@ -212,7 +215,10 @@ class CollaborativeEditor {
                 line: position.line,
                 character: position.character
             });
-            this.showCursor(position, 'Test User');
+            this.showRemoteCursor({
+                position: position,
+                username: 'Test User'
+            });
             return;
         }
 

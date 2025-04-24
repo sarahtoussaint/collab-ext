@@ -1,15 +1,18 @@
 {
   "name": "collab-code",
-  "displayName": "collab-code",
-  "description": "",
+  "displayName": "CollabCode",
+  "description": "A collaborative code editing extension",
   "version": "0.0.1",
+  "publisher": "team-collab",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "*"
+  ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
@@ -24,8 +27,13 @@
     "pretest": "npm run lint",
     "test": "vscode-test"
   },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "ip": "^1.1.8"
+  },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.10",
     "@types/mocha": "^10.0.6",
     "@types/node": "18.x",
     "eslint": "^8.56.0",
