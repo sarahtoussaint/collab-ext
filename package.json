@@ -20,7 +20,17 @@
         "command": "collab-code.helloWorld",
         "title": "Open CollabCode Chat"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "CollabCode",
+      "properties": {
+        "collab-code.serverUrl": {
+          "type": "string",
+          "default": "ws://localhost:8080",
+          "description": "WebSocket server URL for collaborative editing"
+        }
+      }
+    }
   },
   "scripts": {
     "lint": "eslint .",

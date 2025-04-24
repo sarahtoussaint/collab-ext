@@ -101,7 +101,9 @@ class CollaborativeEditor {
         return new Promise((resolve, reject) => {
             try {
                 console.log('CollaborativeEditor: Creating WebSocket connection...');
-                this.ws = new WebSocket('ws://172.16.0.63:8080');
+                const config = vscode.workspace.getConfiguration('collab-code');
+                const serverUrl = config.get('serverUrl') || 'ws://localhost:8080';
+                this.ws = new WebSocket(serverUrl);
                 
                 this.ws.onopen = () => {
                     console.log('CollaborativeEditor: WebSocket connection successful!');
