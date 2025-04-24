@@ -1,17 +1,15 @@
 {
   "name": "collab-code",
-  "displayName": "collab code",
-  "description": "A collaborative code editing extension for VS Code",
+  "displayName": "collab-code",
+  "description": "",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.99.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onStartupFinished"
-  ],
+  "activationEvents": [],
   "main": "./extension.js",
   "contributes": {
     "commands": [
@@ -19,37 +17,19 @@
         "command": "collab-code.helloWorld",
         "title": "Open CollabCode Chat"
       }
-    ],
-    "configuration": {
-      "title": "CollabCode",
-      "properties": {
-        "collabCode.username": {
-          "type": "string",
-          "default": "",
-          "description": "Your display name in CollabCode"
-        },
-        "collabCode.serverUrl": {
-          "type": "string",
-          "default": "ws://localhost:8080",
-          "description": "WebSocket server URL for collaboration"
-        }
-      }
-    }
+    ]
   },
   "scripts": {
     "lint": "eslint .",
     "pretest": "npm run lint",
-    "test": "vscode-test",
-    "start-server": "node server.js"
+    "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "20.x",
-    "@types/vscode": "^1.99.0",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1",
-    "eslint": "^9.23.0",
-    "ip": "^1.1.9",
-    "ws": "^8.16.0"
+    "@types/vscode": "^1.85.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3",
+    "@vscode/test-electron": "^2.3.8"
   }
 }
