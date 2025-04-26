@@ -33,10 +33,12 @@ wss.on('connection', (ws) => {
 });
 
 function broadcast(sender, message) {
+  console.log(`Broadcasting message from ${clients.get(sender)} to ${clients.size - 1} other clients`);
   clients.forEach((clientId, client) => {
-    if (client !== sender && client.readyState === WebSocket.OPEN) {
-      client.send(message);
-    }
+      if (client !== sender && client.readyState === WebSocket.OPEN) {
+          console.log(`Sending to client: ${clientId}`);
+          client.send(message);
+      }
   });
 }
 

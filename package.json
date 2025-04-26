@@ -19,8 +19,26 @@
       {
         "command": "collab-code.helloWorld",
         "title": "Open CollabCode Chat"
+      },
+      {
+        "command": "collab-code.connect",
+        "title": "Connect to CollabCode Server"
+      },
+      {
+        "command": "collab-code.startServer",
+        "title": "Start CollabCode Server"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "CollabCode",
+      "properties": {
+        "collab-code.serverUrl": {
+          "type": "string",
+          "default": "",
+          "description": "WebSocket server URL for collaborative editing"
+        }
+      }
+    }
   },
   "scripts": {
     "lint": "eslint .",
@@ -28,16 +46,16 @@
     "test": "vscode-test"
   },
   "dependencies": {
-    "ws": "^8.18.0",
-    "ip": "^1.1.8"
+    "ip": "^1.1.8",
+    "ws": "^8.18.1"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
-    "@types/ws": "^8.5.10",
     "@types/mocha": "^10.0.6",
     "@types/node": "18.x",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.10",
+    "@vscode/test-electron": "^2.3.8",
     "eslint": "^8.56.0",
-    "typescript": "^5.3.3",
-    "@vscode/test-electron": "^2.3.8"
+    "typescript": "^5.3.3"
   }
 }
