@@ -11,7 +11,9 @@
     "Other"
   ],
   "activationEvents": [
-    "*"
+    "onCommand:collab-code.helloWorld",
+    "onCommand:collab-code.connect",
+    "onCommand:collab-code.startServer"
   ],
   "main": "./extension.js",
   "contributes": {

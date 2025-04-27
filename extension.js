@@ -25,34 +25,8 @@ function activate(context) {
 		);
 
 		panel.webview.html = getWebviewContent();
-
-		panel.webview.onDidReceiveMessage(
-			message => {
-				if (message.type === 'chat') {
-					const timestamp = new Date().toLocaleTimeString([], {
-						hour: '2-digit',
-						minute: '2-digit'
-					});
-
-					panel.webview.postMessage({
-						type: 'chat',
-						text: message.text,
-						timestamp: timestamp,
-						user: 'You'
-					});
-					
-					if (collaborativeEditor) {
-						collaborativeEditor.sendChatMessage(message.text);
-					}
-				} else if (message.type === 'reaction') {
-					vscode.window.showInformationMessage(`You reacted with ${message.reaction}`);
-				}
-			},
-			undefined,
-			context.subscriptions
-		);
 	});
-	
+
 	const connectCommand = vscode.commands.registerCommand('collab-code.connect', async function () {
 		const serverUrl = await vscode.window.showInputBox({
 			placeHolder: 'Enter server URL (e.g., ws://192.168.1.5:8080)',
@@ -70,7 +44,7 @@ function activate(context) {
 			});
 		}
 	});
-	
+
 	const startServerCommand = vscode.commands.registerCommand('collab-code.startServer', function () {
 		const terminal = vscode.window.createTerminal('CollabCode Server');
 		terminal.sendText('node server.js');
@@ -229,6 +203,60 @@ function getWebviewContent() {
 					align-items: center;
 				}
 			</style>
+
+			<script type="module">
+				import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+				import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+				const firebaseConfig = {
+					apiKey: "AIzaSyBysdPKO20O9NaAuqvr9XXXB2uBIqAFGxI",
+					authDomain: "collabcode-chat.firebaseapp.com",
+					databaseURL: "https://collabcode-chat-default-rtdb.firebaseio.com/",
+					projectId: "collabcode-chat",
+					storageBucket: "collabcode-chat.appspot.com",
+					messagingSenderId: "822599985818",
+					appId: "1:822599985818:web:36b865cb2f158809d4cd23"
+				};
+
+				const app = initializeApp(firebaseConfig);
+				const database = getDatabase(app);
+				const chatRef = ref(database, 'messages');
+
+				window.sendMessage = function() {
+					const input = document.getElementById('message');
+					if (input.value.trim() !== '') {
+						push(chatRef, {
+							user: "You",
+							text: input.value,
+							timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+						});
+						input.value = '';
+					}
+				};
+
+				onValue(chatRef, (snapshot) => {
+					const chat = document.getElementById('chat');
+					chat.innerHTML = '';
+					const data = snapshot.val();
+					for (let id in data) {
+						const message = data[id];
+						const messageHTML = \`
+							<div class="message user">
+								<div class="bubble">
+									<div class="bubble-header">
+										<span class="bubble-user">\${message.user}</span>
+										<span class="bubble-time">\${message.timestamp}</span>
+									</div>
+									<div class="bubble-text">\${message.text}</div>
+								</div>
+							</div>
+						\`;
+						chat.innerHTML += messageHTML;
+					}
+					chat.scrollTop = chat.scrollHeight;
+				});
+			</script>
+
 		</head>
 		<body>
 			<h3>Live Chat 💬</h3>
@@ -237,57 +265,6 @@ function getWebviewContent() {
 				<input id="message" placeholder="Say something..." />
 				<button onclick="sendMessage()">Send</button>
 			</div>
-
-			<script>
-				const vscode = acquireVsCodeApi();
-
-				function sendMessage() {
-					const input = document.getElementById('message');
-
-					if (input.value.trim() !== '') {
-						vscode.postMessage({ type: 'chat', text: input.value });
-						input.value = '';
-					}
-				}
-				document.getElementById('message').addEventListener('keydown', function(event) {
-					if (event.key === 'Enter') {
-						sendMessage();
-					}
-				});
-
-				window.addEventListener('message', event => {
-					const message = event.data;
-					if (message.type === 'chat') {
-						const chat = document.getElementById('chat');
-						const messageHTML = \`
-							<div class="message user">
-								<div class="bubble"> 
-									<div class="bubble-header"> 
-										<span class="bubble-user">\${message.user}</span>
-										<span class="bubble-time">\${message.timestamp}</span>
-									</div>
-									<div class="bubble-text">\${message.text}</div>
-									<div class="reactions">
-										<span class="reaction">👍</span>
-										<span class="reaction">❤️</span>
-										<span class="reaction">😂</span>
-									</div>
-								</div>
-							</div>
-						\`;
-						chat.innerHTML += messageHTML;
-						chat.scrollTop = chat.scrollHeight;
-					}
-				});
-
-				document.addEventListener('click', function (e) {
-					if (e.target.classList.contains('reaction')) {
-						const reaction = e.target.textContent;
-						e.target.classList.toggle('clicked');
-						vscode.postMessage({ type: 'reaction', reaction });
-					}
-				});
-			</script>
 		</body>
 		</html>
 	`;
