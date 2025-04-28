@@ -9,12 +9,18 @@ let collaborativeEditor;
 function activate(context) {
 	console.log('Congratulations, your extension "collab-code" is now active!');
 
-	collaborativeEditor = new CollaborativeEditor();
-	collaborativeEditor.initialize().catch(error => {
-		console.error('Failed to initialize collaborative editor:', error);
-	});
+	const chatCommand = vscode.commands.registerCommand('collab-code.helloWorld', async function () {
+		if (!collaborativeEditor) {
+			collaborativeEditor = new CollaborativeEditor();
+		}
 
-	const chatCommand = vscode.commands.registerCommand('collab-code.helloWorld', function () {
+		try {
+			await collaborativeEditor.initialize(); 
+		} catch (error) {
+			console.error('Failed to initialize collaborative editor:', error);
+			return;
+		}
+
 		const panel = vscode.window.createWebviewPanel(
 			'collabChat',
 			'CollabCode Chat',
@@ -25,6 +31,10 @@ function activate(context) {
 		);
 
 		panel.webview.html = getWebviewContent();
+		panel.webview.postMessage({
+			type: 'setUsername',
+			username: collaborativeEditor.username
+		});
 	});
 
 	const connectCommand = vscode.commands.registerCommand('collab-code.connect', async function () {
@@ -53,6 +63,13 @@ function activate(context) {
 		const ip = require('ip');
 		const localIP = ip.address();
 		vscode.window.showInformationMessage(`Server started. Share this address with collaborators: ws://${localIP}:8080`);
+	});
+
+	vscode.window.onDidChangeTextEditorSelection(event => {
+		if (collaborativeEditor && event.textEditor === vscode.window.activeTextEditor) {
+			const position = event.selections[0].active;
+			collaborativeEditor.sendCursorPosition(position);
+		}
 	});
 
 	context.subscriptions.push(chatCommand, connectCommand, startServerCommand);
@@ -149,7 +166,7 @@ function getWebviewContent() {
 
 				.reaction {
 					cursor: pointer;
-					font-size: 16px;
+					font-size: 18px;
 					user-select: none;
 					padding: 4px 6px;
 					border-radius: 5px;
@@ -159,12 +176,6 @@ function getWebviewContent() {
 				.reaction:hover {
 					transform: scale(1.2);
 					background-color: #444;
-				}
-
-				.reaction.clicked {
-					background-color: #3794ff;
-					color: white;
-					font-weight: bold;
 				}
 
 				input {
@@ -222,11 +233,21 @@ function getWebviewContent() {
 				const database = getDatabase(app);
 				const chatRef = ref(database, 'messages');
 
+				let currentUsername = "Anonymous"; // default
+
+				window.addEventListener('message', event => {
+				const message = event.data;
+				if (message.type === 'setUsername') {
+					currentUsername = message.username || "Anonymous";
+				}
+			});
+
 				window.sendMessage = function() {
 					const input = document.getElementById('message');
 					if (input.value.trim() !== '') {
 						push(chatRef, {
-							user: "You",
+							type: "chat",
+							user: currentUsername,
 							text: input.value,
 							timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 						});
@@ -240,20 +261,53 @@ function getWebviewContent() {
 					const data = snapshot.val();
 					for (let id in data) {
 						const message = data[id];
-						const messageHTML = \`
-							<div class="message user">
-								<div class="bubble">
-									<div class="bubble-header">
-										<span class="bubble-user">\${message.user}</span>
-										<span class="bubble-time">\${message.timestamp}</span>
+
+						if (message.type === "reaction") {
+							const reactionHTML = \`
+								<div class="message user">
+									<div class="bubble">
+										<div class="bubble-header">
+											<span class="bubble-user">\${message.user}</span>
+											<span class="bubble-time">\${message.timestamp}</span>
+										</div>
+										<div class="bubble-text">reacted with \${message.emoji}</div>
 									</div>
-									<div class="bubble-text">\${message.text}</div>
 								</div>
-							</div>
-						\`;
-						chat.innerHTML += messageHTML;
+							\`;
+							chat.innerHTML += reactionHTML;
+						} else if (message.type === "chat") {
+							const messageHTML = \`
+								<div class="message user">
+									<div class="bubble">
+										<div class="bubble-header">
+											<span class="bubble-user">\${message.user}</span>
+											<span class="bubble-time">\${message.timestamp}</span>
+										</div>
+										<div class="bubble-text">\${message.text}</div>
+										<div class="reactions">
+											<span class="reaction">👍</span>
+											<span class="reaction">❤️</span>
+											<span class="reaction">😂</span>
+										</div>
+									</div>
+								</div>
+							\`;
+							chat.innerHTML += messageHTML;
+						}
 					}
 					chat.scrollTop = chat.scrollHeight;
+				});
+
+				document.addEventListener('click', function (e) {
+					if (e.target.classList.contains('reaction')) {
+						const reactionEmoji = e.target.textContent;
+						push(chatRef, {
+							type: "reaction",
+							user: currentUsername,
+							emoji: reactionEmoji,
+							timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+						});
+					}
 				});
 			</script>
 
@@ -269,6 +323,7 @@ function getWebviewContent() {
 		</html>
 	`;
 }
+
 
 function deactivate() {
 	if (collaborativeEditor) {

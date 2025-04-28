@@ -10,25 +10,75 @@ class CollaborativeEditor {
         this.isTestEnvironment = false;
         this.ws = null;
         this.clientId = Math.random().toString(36).substr(2, 9);
-        this.username = `User${this.clientId.substr(0, 4)}`;
         this.cursorDecorations = new Map();
         this.activeUsers = new Map();
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
         console.log('CollaborativeEditor: Constructor called');
+    }
+
+    async initialize() {
+        console.log('CollaborativeEditor: Initialization started');
+
+        await this.askForUsername();
         this.setupEditorListeners();
+
+        const config = vscode.workspace.getConfiguration('collab-code');
+        let serverUrl = config.get('serverUrl');
+
+        if (!serverUrl) {
+            const options = ['Start a new server', 'Connect to existing server'];
+            const choice = await vscode.window.showQuickPick(options, {
+                placeHolder: 'Choose collaboration mode'
+            });
+
+            if (choice === options[0]) {
+                this.startLocalServer();
+                serverUrl = `ws://localhost:8080`;
+            } else if (choice === options[1]) {
+                serverUrl = await vscode.window.showInputBox({
+                    placeHolder: 'Enter server URL (e.g., ws://192.168.1.5:8080)',
+                    prompt: 'Enter the WebSocket server URL to connect to'
+                });
+
+                if (!serverUrl) {
+                    vscode.window.showWarningMessage('No server URL provided. Collaboration disabled.');
+                    return Promise.reject('No server URL provided');
+                }
+            } else {
+                return Promise.reject('Operation cancelled');
+            }
+
+            await vscode.workspace.getConfiguration('collab-code').update('serverUrl', serverUrl, true);
+        }
+
+        return this.connectWebSocket(serverUrl);
+    }
+
+    async askForUsername() {
+        const name = await vscode.window.showInputBox({
+            prompt: 'Enter your display name',
+            placeHolder: 'e.g., Sarah, Lily, Alex',
+            validateInput: (text) => text.length === 0 ? 'Name cannot be empty!' : null
+        });
+
+        if (name) {
+            this.username = name.trim();
+        } else {
+            this.username = `User${this.clientId.substr(0, 4)}`;
+        }
     }
 
     setupEditorListeners() {
         console.log('CollaborativeEditor: Setting up editor listeners');
+
         vscode.window.onDidChangeActiveTextEditor(editor => {
             console.log('CollaborativeEditor: Active editor changed');
             this.editor = editor;
             if (editor) {
                 this.document = editor.document;
                 this.registerCursorTracking(editor);
-                vscode.window.showInformationMessage('CollabCode: Collaboration mode activated!');
+                vscode.window.showInformationMessage(`CollabCode: Collaboration mode activated as ${this.username}!`);
                 this.updateStatusBar('Connected');
-                console.log('CollaborativeEditor: Editor initialized');
             }
         });
 
@@ -41,29 +91,21 @@ class CollaborativeEditor {
     }
 
     registerCursorTracking(editor) {
-        console.log('CollaborativeEditor: Register cursor tracking');
+        console.log('CollaborativeEditor: Registering cursor tracking');
         vscode.window.onDidChangeTextEditorSelection(event => {
-            console.log('Cursor position changed:', event.selections[0].active);
             if (event.textEditor === editor) {
                 const position = event.selections[0].active;
-                console.log('Sending cursor position:', position);
-                
                 this.showLocalCursor(position);
-                
+
                 if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                    console.log('WebSocket is open, sending cursor data');
-                    const data = JSON.stringify({
+                    this.ws.send(JSON.stringify({
                         type: 'cursor',
                         position: {
                             line: position.line,
                             character: position.character
                         },
                         username: this.username
-                    });
-                    console.log('Sending data:', data);
-                    this.ws.send(data);
-                } else {
-                    console.log('WebSocket not ready:', this.ws ? this.ws.readyState : 'null');
+                    }));
                 }
             }
         });
@@ -71,7 +113,7 @@ class CollaborativeEditor {
 
     showLocalCursor(position) {
         if (!this.editor) return;
-        
+
         const decorationType = vscode.window.createTextEditorDecorationType({
             backgroundColor: 'rgba(0, 255, 0, 0.2)',
             border: '2px solid green',
@@ -92,103 +134,49 @@ class CollaborativeEditor {
         this.cursorDecorations.set('local', decorationType);
     }
 
-    async initialize() {
-        console.log('CollaborativeEditor: Initialization started');
-        
-        const config = vscode.workspace.getConfiguration('collab-code');
-        let serverUrl = config.get('serverUrl');
-        
-        if (!serverUrl) {
-            const options = ['Start a new server', 'Connect to existing server'];
-            const choice = await vscode.window.showQuickPick(options, {
-                placeHolder: 'Choose collaboration mode'
-            });
-            
-            if (choice === options[0]) {
-                this.startLocalServer();
-                serverUrl = `ws://localhost:8080`;
-            } else if (choice === options[1]) {
-                serverUrl = await vscode.window.showInputBox({
-                    placeHolder: 'Enter server URL (e.g., ws://192.168.1.5:8080)',
-                    prompt: 'Enter the WebSocket server URL to connect to'
-                });
-                
-                if (!serverUrl) {
-                    vscode.window.showWarningMessage('No server URL provided. Collaboration disabled.');
-                    return Promise.reject('No server URL provided');
-                }
-            } else {
-                return Promise.reject('Operation cancelled');
-            }
-            
-            await vscode.workspace.getConfiguration('collab-code').update('serverUrl', serverUrl, true);
-        }
-        
-        return this.connectWebSocket(serverUrl);
-    }
-
     startLocalServer() {
         const terminal = vscode.window.createTerminal('CollabCode Server');
         terminal.sendText('node server.js');
         terminal.show();
-        
+
         const localIP = ip.address();
         vscode.window.showInformationMessage(`Server started. Share this address with collaborators: ws://${localIP}:8080`);
     }
 
     connectWebSocket(serverUrl) {
-        console.log('CollaborativeEditor: Attempting to connect WebSocket to', serverUrl);
         return new Promise((resolve, reject) => {
             try {
-                console.log('CollaborativeEditor: Creating WebSocket connection...');
                 this.ws = new WebSocket(serverUrl);
-                
+
                 this.ws.onopen = () => {
-                    console.log('CollaborativeEditor: WebSocket connection successful!');
                     vscode.window.showInformationMessage(`CollabCode: Connected to ${serverUrl}`);
                     this.updateStatusBar(`Connected to ${serverUrl}`);
-                    
+
                     this.ws.send(JSON.stringify({
                         type: 'userInfo',
                         clientId: this.clientId,
                         username: this.username
                     }));
-                    
+
                     resolve();
                 };
 
                 this.ws.onerror = (error) => {
-                    console.error('CollaborativeEditor: WebSocket error:', error);
-                    vscode.window.showErrorMessage(`CollabCode: WebSocket connection failed to ${serverUrl}`);
+                    vscode.window.showErrorMessage(`CollabCode: WebSocket connection failed.`);
                     this.updateStatusBar('Connection failed');
-                    
-                    vscode.window.showQuickPick(['Try another server', 'Cancel'], {
-                        placeHolder: 'Connection failed. What would you like to do?'
-                    }).then(choice => {
-                        if (choice === 'Try another server') {
-                            vscode.workspace.getConfiguration('collab-code').update('serverUrl', '', true)
-                            .then(() => {
-                                this.initialize();
-                            });
-                        }
-                    });
-                    
                     reject(error);
                 };
 
                 this.ws.onmessage = (event) => {
-                    console.log('CollaborativeEditor: Message received:', event.data);
                     this.handleMessage(event.data);
                 };
 
                 this.ws.onclose = () => {
-                    console.log('CollaborativeEditor: WebSocket connection closed');
-                    vscode.window.showWarningMessage('CollabCode: WebSocket connection closed');
+                    vscode.window.showWarningMessage('CollabCode: WebSocket connection closed.');
                     this.updateStatusBar('Disconnected');
                 };
             } catch (error) {
-                console.error('CollaborativeEditor: Error connecting to WebSocket:', error);
-                vscode.window.showErrorMessage('CollabCode: Error connecting to WebSocket!');
+                vscode.window.showErrorMessage('CollabCode: WebSocket error.');
                 this.updateStatusBar('Connection error');
                 reject(error);
             }
@@ -196,26 +184,19 @@ class CollaborativeEditor {
     }
 
     handleMessage(data) {
-        console.log('Processing received message:', data);
         const message = typeof data === 'string' ? JSON.parse(data) : data;
-        
-        console.log('Parsed message:', message);
-        console.log('Client ID comparison:', message.senderId, this.clientId);
-        
-        if (message.senderId === this.clientId) {
-            console.log('Ignoring own message');
-            return;
-        }
 
-        console.log('Processing message of type:', message.type);
-        
+        if (message.senderId === this.clientId) return;
+
         switch (message.type) {
             case 'cursor':
-                console.log('Showing remote cursor:', message);
                 this.showRemoteCursor(message);
                 break;
             case 'edit':
                 this.applyRemoteEdit(message);
+                break;
+            case 'chat':
+                vscode.window.showInformationMessage(`${message.username || 'Someone'} says: ${message.text}`);
                 break;
             case 'userCount':
                 this.updateStatusBar(`Online users: ${message.count}`);
@@ -225,11 +206,10 @@ class CollaborativeEditor {
 
     showRemoteCursor(data) {
         if (!this.editor) return;
-        console.log('Showing remote cursor with data:', data);
-        
+
         const position = new vscode.Position(data.position.line, data.position.character);
         const username = data.username || `User${data.senderId.substr(0, 4)}`;
-        
+
         const decorationType = vscode.window.createTextEditorDecorationType({
             backgroundColor: 'rgba(255, 0, 0, 0.2)',
             border: '2px solid red',
@@ -248,129 +228,14 @@ class CollaborativeEditor {
 
         this.editor.setDecorations(decorationType, [new vscode.Range(position, position)]);
         this.cursorDecorations.set(data.senderId, decorationType);
-        console.log('Remote cursor decoration set for:', username);
     }
 
     applyRemoteEdit(edit) {
         if (!this.editor) return;
-
         const position = new vscode.Position(edit.line, edit.character);
-        const range = new vscode.Range(position, position);
-        
         this.editor.edit(editBuilder => {
             editBuilder.insert(position, edit.text);
-            vscode.window.showInformationMessage(`CollabCode: Edit received from other user`);
         });
-    }
-
-    sendEdit(edit) {
-        if (this.isTestEnvironment) {
-            console.log('Test environment: Edit skipped', edit);
-            return;
-        }
-
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                type: 'edit',
-                ...edit
-            }));
-        }
-    }
-
-    sendCursorPosition(position) {
-        if (this.isTestEnvironment) {
-            console.log('Test environment: Cursor position update', {
-                line: position.line,
-                character: position.character
-            });
-            this.showRemoteCursor({
-                position: position,
-                username: 'Test User'
-            });
-            return;
-        }
-
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                type: 'cursor',
-                position: {
-                    line: position.line,
-                    character: position.character
-                },
-                username: this.username || 'Anonymous'
-            }));
-        }
-    }
-
-    sendChatMessage(text) {
-        if (this.isTestEnvironment) {
-            console.log('Test environment: Chat message skipped', text);
-            return;
-        }
-
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                type: 'chat',
-                text: text
-            }));
-        }
-    }
-
-    registerTextEditTracking() {
-        vscode.workspace.onDidChangeTextDocument((event) => {
-            if (event.document === vscode.window.activeTextEditor?.document) {
-                this.sendTextEdit(event);
-            }
-        });
-    }
-
-    sendTextEdit(event) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                type: 'edit',
-                changes: event.contentChanges,
-                documentVersion: event.document.version
-            }));
-        }
-    }
-
-    updateUserList(users) {
-        this.activeUsers.clear();
-        users.forEach(user => {
-            this.activeUsers.set(user.id, user);
-        });
-        this.updateStatusBar();
-    }
-
-    updateCursorDecorations(positions) {
-        this.cursorDecorations.forEach(decoration => decoration.dispose());
-        this.cursorDecorations.clear();
-
-        positions.forEach(position => {
-            const user = this.activeUsers.get(position.id);
-            if (user) {
-                const decoration = this.createCursorDecoration(position, user.username);
-                this.cursorDecorations.set(position.id, decoration);
-            }
-        });
-    }
-
-    createCursorDecoration(position, username) {
-        const decorationType = vscode.window.createTextEditorDecorationType({
-            after: {
-                contentText: username,
-                color: '#666666',
-                margin: '0 0 0 1em'
-            }
-        });
-
-        const range = new vscode.Range(
-            new vscode.Position(position.line, position.character),
-            new vscode.Position(position.line, position.character)
-        );
-
-        vscode.window.activeTextEditor?.setDecorations(decorationType, [range]);
-        return decorationType;
     }
 
     updateStatusBar(status) {
@@ -380,9 +245,7 @@ class CollaborativeEditor {
     }
 
     dispose() {
-        if (this.ws) {
-            this.ws.close();
-        }
+        if (this.ws) this.ws.close();
         this.cursorDecorations.forEach(decoration => decoration.dispose());
         this.statusBarItem.dispose();
     }
