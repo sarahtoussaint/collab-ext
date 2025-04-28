@@ -1,45 +1,49 @@
 {
   "name": "collab-code",
-  "displayName": "CollabCode",
-  "description": "A collaborative code editing extension",
+  "displayName": "collab code",
+  "publisher": "lorriesavage",
+  "description": "",
   "version": "0.0.1",
-  "publisher": "team-collab",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.99.0"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onCommand:collab-code.helloWorld",
-    "onCommand:collab-code.connect",
-    "onCommand:collab-code.startServer"
+    "onCommand:collab-code.takeNotes",
+    "onView:collabNotes.sidebarView"
   ],
-  "main": "./extension.js",
+  "main": "./src/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "collab-code.helloWorld",
-        "title": "Open CollabCode Chat"
+        "title": "Hello World"
       },
       {
-        "command": "collab-code.connect",
-        "title": "Connect to CollabCode Server"
-      },
-      {
-        "command": "collab-code.startServer",
-        "title": "Start CollabCode Server"
+        "command": "collab-code.takeNotes",
+        "title": "Take Notes"
       }
     ],
-    "configuration": {
-      "title": "CollabCode",
-      "properties": {
-        "collab-code.serverUrl": {
-          "type": "string",
-          "default": "",
-          "description": "WebSocket server URL for collaborative editing"
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "collabNotes",
+          "title": "Collab Notes",
+          "icon": "media/icon.svg"
         }
-      }
+      ]
+    },
+    "views": {
+      "collabNotes": [
+        {
+          "id": "collabNotes.sidebarView",
+          "name": "Notes & To-Dos"
+        }
+      ]
     }
   },
   "scripts": {
@@ -47,17 +51,18 @@
     "pretest": "npm run lint",
     "test": "vscode-test"
   },
-  "dependencies": {
-    "ip": "^1.1.8",
-    "ws": "^8.18.1"
-  },
   "devDependencies": {
-    "@types/mocha": "^10.0.6",
-    "@types/node": "18.x",
-    "@types/vscode": "^1.85.0",
-    "@types/ws": "^8.5.10",
-    "@vscode/test-electron": "^2.3.8",
-    "eslint": "^8.56.0",
-    "typescript": "^5.3.3"
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.99.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.23.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "ip": "^2.0.1",
+    "ws": "^8.18.1"
   }
 }
