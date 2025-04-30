@@ -65,6 +65,20 @@ function activate(context) {
 		vscode.window.showInformationMessage(`Server started. Share this address with collaborators: ws://${localIP}:8080`);
 	});
 
+	const notesCommand = vscode.commands.registerCommand('collab-code.openNotes', async function () {
+		const panel = vscode.window.createWebviewPanel(
+			'collabNotes',
+			'CollabCode Notes',
+			vscode.ViewColumn.Two,
+			{
+				enableScripts: true
+			}
+		);
+	
+		panel.webview.html = getNotesWebviewContent();
+	});
+	context.subscriptions.push(notesCommand);
+	
 	vscode.window.onDidChangeTextEditorSelection(event => {
 		if (collaborativeEditor && event.textEditor === vscode.window.activeTextEditor) {
 			const position = event.selections[0].active;
@@ -321,6 +335,73 @@ function getWebviewContent() {
 			</div>
 		</body>
 		</html>
+	`;
+}
+
+function getNotesWebviewContent() {
+	return `
+	<!DOCTYPE html>
+	<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>Shared Notes</title>
+		<style>
+			body {
+				font-family: Arial, sans-serif;
+				background-color: #1e1e1e;
+				color: #fff;
+				padding: 16px;
+			}
+			textarea {
+				width: 100%;
+				height: 400px;
+				background-color: #252526;
+				color: #fff;
+				border: 1px solid #3c3c3c;
+				padding: 12px;
+				font-size: 16px;
+				border-radius: 8px;
+			}
+		</style>
+	</head>
+	<body>
+		<h3>📒 Shared Notes</h3>
+		<textarea id="notes" placeholder="Write shared notes here..."></textarea>
+
+		<script type="module">
+			import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+			import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+			const firebaseConfig = {
+				apiKey: "AIzaSyBysdPKO20O9NaAuqvr9XXXB2uBIqAFGxI",
+				authDomain: "collabcode-chat.firebaseapp.com",
+				databaseURL: "https://collabcode-chat-default-rtdb.firebaseio.com/",
+				projectId: "collabcode-chat",
+				storageBucket: "collabcode-chat.appspot.com",
+				messagingSenderId: "822599985818",
+				appId: "1:822599985818:web:36b865cb2f158809d4cd23"
+			};
+
+			const app = initializeApp(firebaseConfig);
+			const db = getDatabase(app);
+			const notesRef = ref(db, 'sharedNotes');
+
+			const textarea = document.getElementById('notes');
+
+			// Sync updates
+			onValue(notesRef, (snapshot) => {
+				const val = snapshot.val();
+				if (val !== null && val !== textarea.value) {
+					textarea.value = val;
+				}
+			});
+
+			textarea.addEventListener('input', () => {
+				set(notesRef, textarea.value);
+			});
+		</script>
+	</body>
+	</html>
 	`;
 }
 

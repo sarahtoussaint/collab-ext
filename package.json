@@ -13,22 +13,27 @@
   "activationEvents": [
     "onCommand:collab-code.helloWorld",
     "onCommand:collab-code.connect",
-    "onCommand:collab-code.startServer"
+    "onCommand:collab-code.startServer",
+    "onCommand:collab-code.openNotes"
   ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
       {
         "command": "collab-code.helloWorld",
-        "title": "Open CollabCode Chat"
+        "title": "CollabCode: Open Live Chat"
       },
       {
         "command": "collab-code.connect",
-        "title": "Connect to CollabCode Server"
+        "title": "CollabCode: Connect to Server"
       },
       {
         "command": "collab-code.startServer",
-        "title": "Start CollabCode Server"
+        "title": "CollabCode: Start Server"
+      },
+      {
+        "command": "collab-code.openNotes",
+        "title": "CollabCode: Open Shared Notes"
       }
     ],
     "configuration": {
@@ -42,6 +47,13 @@
       }
     }
   },
+  "keybindings": [
+    {
+      "command": "collab-code.openNotes",
+      "key": "ctrl+alt+n",
+      "when": "editorTextFocus"
+    }
+  ],
   "scripts": {
     "lint": "eslint .",
     "pretest": "npm run lint",

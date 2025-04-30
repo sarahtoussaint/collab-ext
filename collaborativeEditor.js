@@ -21,6 +21,8 @@ class CollaborativeEditor {
 
         await this.askForUsername();
         this.setupEditorListeners();
+        this.registerTextEditTracking();
+
 
         const config = vscode.workspace.getConfiguration('collab-code');
         let serverUrl = config.get('serverUrl');
@@ -39,6 +41,7 @@ class CollaborativeEditor {
                     placeHolder: 'Enter server URL (e.g., ws://192.168.1.5:8080)',
                     prompt: 'Enter the WebSocket server URL to connect to'
                 });
+                
 
                 if (!serverUrl) {
                     vscode.window.showWarningMessage('No server URL provided. Collaboration disabled.');
@@ -201,6 +204,11 @@ class CollaborativeEditor {
             case 'userCount':
                 this.updateStatusBar(`Online users: ${message.count}`);
                 break;
+                case 'userLeft':
+                    this.removeUserCursor(message.senderId); 
+                    break;
+                
+
         }
     }
 
@@ -230,13 +238,61 @@ class CollaborativeEditor {
         this.cursorDecorations.set(data.senderId, decorationType);
     }
 
-    applyRemoteEdit(edit) {
-        if (!this.editor) return;
-        const position = new vscode.Position(edit.line, edit.character);
-        this.editor.edit(editBuilder => {
-            editBuilder.insert(position, edit.text);
+    removeUserCursor(senderId) {
+        const decoration = this.cursorDecorations.get(senderId);
+        if (decoration) {
+            decoration.dispose();
+            this.cursorDecorations.delete(senderId);
+        }
+        this.activeUsers.delete(senderId);
+    }
+    
+    sendTextEdit(event) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            for (const change of event.contentChanges) {
+                const editPayload = {
+                    type: 'edit',
+                    text: change.text,
+                    range: {
+                        start: {
+                            line: change.range.start.line,
+                            character: change.range.start.character
+                        },
+                        end: {
+                            line: change.range.end.line,
+                            character: change.range.end.character
+                        }
+                    },
+                    senderId: this.clientId
+                };
+                this.ws.send(JSON.stringify(editPayload));
+            }
+        }
+    }
+    
+    
+    registerTextEditTracking() {
+        vscode.workspace.onDidChangeTextDocument((event) => {
+            if (event.document === vscode.window.activeTextEditor?.document) {
+                this.sendTextEdit(event);
+            }
         });
     }
+    
+    
+    applyRemoteEdit(edit) {
+        if (!this.editor || !edit.range) return;
+    
+        const start = new vscode.Position(edit.range.start.line, edit.range.start.character);
+        const end = new vscode.Position(edit.range.end.line, edit.range.end.character);
+        const range = new vscode.Range(start, end);
+    
+        this.editor.edit(editBuilder => {
+            editBuilder.replace(range, edit.text);
+        });
+    }
+    
+    
 
     updateStatusBar(status) {
         this.statusBarItem.text = `$(sync) CollabCode: ${status}`;

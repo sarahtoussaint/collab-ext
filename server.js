@@ -23,7 +23,7 @@ wss.on('connection', (ws) => {
         if (client) {
           client.username = data.username;
         }
-        return; // no need to broadcast userInfo to others
+        return; 
       }
 
       const client = clients.get(ws);
@@ -39,17 +39,29 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    console.log(`Client disconnected: ${clients.get(ws)?.clientId || 'unknown'}`);
+    const leavingClient = clients.get(ws);
+    
+    if (leavingClient) {
+      console.log(`Client disconnected: ${leavingClient.clientId}`);
+      
+      const message = JSON.stringify({
+        type: 'userLeft',
+        senderId: leavingClient.clientId
+      });
+      broadcast(ws, message);
+    }
+  
     clients.delete(ws);
     broadcastUserCount();
   });
+
 });
 
 function broadcast(sender, message) {
   console.log(`Broadcasting message`);
-  clients.forEach((_, client) => {
-    if (client !== sender && client.readyState === WebSocket.OPEN) {
-      client.send(message);
+  clients.forEach((_, wsClient) => {
+    if (wsClient !== sender && wsClient.readyState === WebSocket.OPEN) {
+      wsClient.send(message);
     }
   });
 }
