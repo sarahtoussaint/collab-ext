@@ -13,6 +13,7 @@ class CollaborativeEditor {
         this.cursorDecorations = new Map();
         this.activeUsers = new Map();
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+        this.suppressBroadcast = false;
         console.log('CollaborativeEditor: Constructor called');
     }
 
@@ -274,10 +275,12 @@ class CollaborativeEditor {
     registerTextEditTracking() {
         vscode.workspace.onDidChangeTextDocument((event) => {
             if (event.document === vscode.window.activeTextEditor?.document) {
+                if (this.suppressBroadcast) return; // Skip sending remote changes
                 this.sendTextEdit(event);
             }
         });
     }
+    
     
     
     applyRemoteEdit(edit) {
@@ -287,10 +290,14 @@ class CollaborativeEditor {
         const end = new vscode.Position(edit.range.end.line, edit.range.end.character);
         const range = new vscode.Range(start, end);
     
+        this.suppressBroadcast = true; // 👈 Prevent triggering our own change listener
         this.editor.edit(editBuilder => {
             editBuilder.replace(range, edit.text);
+        }).then(() => {
+            this.suppressBroadcast = false; // 👈 Re-enable after edit
         });
     }
+    
     
     
 

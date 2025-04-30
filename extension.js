@@ -269,6 +269,14 @@ function getWebviewContent() {
 					}
 				};
 
+				import { remove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+				window.clearChat = function () {
+   					if (confirm("Are you sure you want to clear the chat history?")) {
+        				remove(chatRef);
+    				}
+				};
+
 				onValue(chatRef, (snapshot) => {
 					const chat = document.getElementById('chat');
 					chat.innerHTML = '';
@@ -323,18 +331,27 @@ function getWebviewContent() {
 						});
 					}
 				});
+
 			</script>
 
 		</head>
 		<body>
-			<h3>Live Chat 💬</h3>
-			<div id="chat"></div>
-			<div id="input-row">
-				<input id="message" placeholder="Say something..." />
-				<button onclick="sendMessage()">Send</button>
-			</div>
+    		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        		<h3 style="margin: 0;">Live Chat 💬</h3>
+        		<button onclick="clearChat()" title="Clear chat" style="background: none; border: none; font-size: 18px; cursor: pointer;">
+            		🗑️
+        		</button>
+    		</div>
+
+    		<div id="chat"></div>
+
+    		<div id="input-row">
+        		<input id="message" placeholder="Say something..." />
+        		<button onclick="sendMessage()">Send</button>
+    		</div>
 		</body>
 		</html>
+
 	`;
 }
 
