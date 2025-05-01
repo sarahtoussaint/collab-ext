@@ -227,6 +227,15 @@ function getWebviewContent() {
 					justify-content: space-between;
 					align-items: center;
 				}
+				.date-divider {
+  					text-align: center;
+  					color: #999;
+  					margin: 16px 0 8px;
+  					font-size: 0.85em;
+  					border-top: 1px solid #444;
+  					padding-top: 6px;
+				}
+
 			</style>
 
 			<script type="module">
@@ -263,7 +272,7 @@ function getWebviewContent() {
 							type: "chat",
 							user: currentUsername,
 							text: input.value,
-							timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+							timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
 						});
 						input.value = '';
 					}
@@ -281,9 +290,22 @@ function getWebviewContent() {
 					const chat = document.getElementById('chat');
 					chat.innerHTML = '';
 					const data = snapshot.val();
+					let lastDate = null;
 					for (let id in data) {
 						const message = data[id];
 
+						const date = new Date(message.timestamp);
+						const currentDate = date.toDateString();
+
+						if (currentDate !== lastDate) {
+							const divider = document.createElement('div');
+							divider.className = 'date-divider';
+							divider.textContent = currentDate;
+							chat.appendChild(divider);
+							lastDate = currentDate;
+						}
+
+							
 						if (message.type === "reaction") {
 							const reactionHTML = \`
 								<div class="message user">
