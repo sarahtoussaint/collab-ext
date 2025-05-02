@@ -272,19 +272,14 @@ function getWebviewContent() {
 							type: "chat",
 							user: currentUsername,
 							text: input.value,
-							timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
+							timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric'})
 						});
 						input.value = '';
 					}
 				};
 
 				import { remove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
-
-				window.clearChat = function () {
-   					if (confirm("Are you sure you want to clear the chat history?")) {
-        				remove(chatRef);
-    				}
-				};
+				remove(chatRef);
 
 				onValue(chatRef, (snapshot) => {
 					const chat = document.getElementById('chat');
@@ -360,9 +355,6 @@ function getWebviewContent() {
 		<body>
     		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         		<h3 style="margin: 0;">Live Chat 💬</h3>
-        		<button onclick="clearChat()" title="Clear chat" style="background: none; border: none; font-size: 18px; cursor: pointer;">
-            		🗑️
-        		</button>
     		</div>
 
     		<div id="chat"></div>
