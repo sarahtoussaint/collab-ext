@@ -1,5 +1,6 @@
 const vscode = require('vscode');
 const CollaborativeEditor = require('./collaborativeEditor');
+const { time } = require('console');
 
 let collaborativeEditor;
 
@@ -272,11 +273,12 @@ function getWebviewContent() {
 							type: "chat",
 							user: currentUsername,
 							text: input.value,
-							timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric'})
+							timestamp: new Date().toISOString()
 						});
 						input.value = '';
 					}
 				};
+				
 
 				import { remove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 				remove(chatRef);
@@ -285,21 +287,17 @@ function getWebviewContent() {
 					const chat = document.getElementById('chat');
 					chat.innerHTML = '';
 					const data = snapshot.val();
-					let lastDate = null;
 					for (let id in data) {
 						const message = data[id];
 
-						const date = new Date(message.timestamp);
-						const currentDate = date.toDateString();
+						const msgDate = new Date(message.timestamp);
+						const time = new Date(message.timestamp).toLocaleTimeString([], { 
+							hour: '2-digit', 
+							minute: '2-digit'
+						});
+				
 
-						if (currentDate !== lastDate) {
-							const divider = document.createElement('div');
-							divider.className = 'date-divider';
-							divider.textContent = currentDate;
-							chat.appendChild(divider);
-							lastDate = currentDate;
-						}
-
+						let messageHTML = '';
 							
 						if (message.type === "reaction") {
 							const reactionHTML = \`
@@ -307,7 +305,7 @@ function getWebviewContent() {
 									<div class="bubble">
 										<div class="bubble-header">
 											<span class="bubble-user">\${message.user}</span>
-											<span class="bubble-time">\${message.timestamp}</span>
+											<span class="bubble-time">${time}</span>
 										</div>
 										<div class="bubble-text">reacted with \${message.emoji}</div>
 									</div>
@@ -320,7 +318,7 @@ function getWebviewContent() {
 									<div class="bubble">
 										<div class="bubble-header">
 											<span class="bubble-user">\${message.user}</span>
-											<span class="bubble-time">\${message.timestamp}</span>
+											<span class="bubble-time">\${time}</span>
 										</div>
 										<div class="bubble-text">\${message.text}</div>
 										<div class="reactions">
