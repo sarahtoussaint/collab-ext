@@ -198,9 +198,9 @@ class CollaborativeEditor {
                 const timeout = setTimeout(() => {
                     if (this.ws.readyState !== WebSocket.OPEN) {
                         this.ws.close();
-                        reject(new Error('Connection timeout. Server might be down or unreachable.'));
+                        reject(new Error('Connection timeout after 15 seconds. Please check:\n1. Server is running\n2. IP address is correct\n3. Windows Firewall is not blocking port 8080'));
                     }
-                }, 5000);
+                }, 15000);
 
                 this.ws.onopen = () => {
                     clearTimeout(timeout);
@@ -220,7 +220,14 @@ class CollaborativeEditor {
                 this.ws.onerror = (error) => {
                     console.error('WebSocket connection error:', error);
                     this.updateStatusBar('Connection failed');
+                    vscode.window.showErrorMessage(`Connection failed. Please check:\n1. Server is running at ${serverUrl}\n2. Both computers are on the same network\n3. Windows Firewall settings`);
                     reject(new Error('Failed to connect to the server. Please check if the server is running.'));
+                };
+
+                this.ws.onclose = () => {
+                    console.log('WebSocket connection closed');
+                    this.updateStatusBar('Disconnected');
+                    vscode.window.showWarningMessage('Connection closed. Server might be unreachable.');
                 };
             } catch (error) {
                 console.error('WebSocket setup error:', error);
