@@ -57,7 +57,8 @@
   "scripts": {
     "lint": "eslint .",
     "pretest": "npm run lint",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "watch": "tsc -watch -p ./"
   },
   "dependencies": {
     "ip": "^1.1.9",

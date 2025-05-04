@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const CollaborativeEditor = require('./collaborativeEditor');
 const { time } = require('console');
+const WebSocket = require('ws');
 
 let collaborativeEditor;
 
@@ -19,28 +20,466 @@ function activate(context) {
 			await collaborativeEditor.initialize(); 
 		} catch (error) {
 			console.error('Failed to initialize collaborative editor:', error);
+			vscode.window.showErrorMessage('Failed to connect to chat server. Please make sure the server is running.');
 			return;
 		}
 
 		const panel = vscode.window.createWebviewPanel(
 			'collabChat',
 			'CollabCode Chat',
-			vscode.ViewColumn.Two,
+			{
+				viewColumn: vscode.ViewColumn.Two,
+				preserveFocus: true
+			},
 			{
 				enableScripts: true
 			}
 		);
 		
-		panel.webview.html = getWebviewContent();
+		collaborativeEditor.chatPanel = panel;
 
-		panel.webview.onDidReceiveMessage((msg) => {
-			if (msg.type === 'ready') {
+		panel.webview.html = `
+		<!DOCTYPE html>
+		<html lang="en">
+		<head>
+			<meta charset="UTF-8">
+			<style>
+				:root {
+					--background: #1e1e1e;
+					--panel-bg: #252526;
+					--border-color: #3c3c3c;
+					--button-bg: #0e639c;
+					--button-hover: #1177bb;
+					--font-color: #d4d4d4;
+					--input-bg: #3c3c3c;
+				}
+
+				.notification-container {
+					position: fixed;
+					bottom: 80px;
+					right: 20px;
+					z-index: 1000;
+				}
+
+				.notification {
+					background-color: rgba(30, 30, 30, 0.9);
+					color: #d4d4d4;
+					padding: 8px 12px;
+					border-radius: 6px;
+					margin-top: 8px;
+					font-size: 12px;
+					animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s;
+					border: 1px solid var(--border-color);
+					box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+				}
+
+				@keyframes slideIn {
+					from {
+						transform: translateX(100%);
+						opacity: 0;
+					}
+					to {
+						transform: translateX(0);
+						opacity: 1;
+					}
+				}
+
+				@keyframes fadeOut {
+					from {
+						opacity: 1;
+					}
+					to {
+						opacity: 0;
+					}
+				}
+
+				body {
+					margin: 0;
+					padding: 16px;
+					background-color: var(--background);
+					font-family: 'Segoe UI', sans-serif;
+					color: var(--font-color);
+				}
+
+				#header {
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					margin-bottom: 16px;
+					padding: 0 10px;
+				}
+
+				h3 {
+					margin: 0;
+					color: #3794ff;
+					font-size: 1.2em;
+				}
+
+				#status {
+					font-size: 0.9em;
+					color: #888;
+				}
+
+				#chat {
+					background-color: var(--panel-bg);
+					border: 1px solid var(--border-color);
+					border-radius: 8px;
+					padding: 16px;
+					height: calc(100vh - 140px);
+					overflow-y: auto;
+					box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+					margin-bottom: 14px;
+				}
+
+				.message {
+					margin-bottom: 12px;
+					opacity: 0;
+					transform: translateY(20px);
+					animation: slideIn 0.3s ease forwards;
+				}
+
+				.message.user {
+					display: flex;
+					justify-content: flex-end;
+				}
+
+				.message.other {
+					display: flex;
+					justify-content: flex-start;
+				}
+
+				.bubble {
+					background-color: #2d2d2d;
+					border-radius: 12px;
+					padding: 10px 14px;
+					max-width: 80%;
+					box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+				}
+
+				.message.user .bubble {
+					background-color: #0e639c;
+				}
+
+				.bubble-header {
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					margin-bottom: 6px;
+					font-size: 0.85em;
+				}
+
+				.bubble-user {
+					font-weight: bold;
+					color: #3794ff;
+				}
+
+				.message.user .bubble-user {
+					color: #fff;
+				}
+
+				.bubble-time {
+					font-size: 0.75em;
+					color: #666;
+					margin-left: 8px;
+				}
+
+				.bubble-text {
+					word-wrap: break-word;
+					line-height: 1.4;
+				}
+
+				.reactions {
+					display: flex;
+					gap: 6px;
+					margin-top: 4px;
+				}
+
+				.reaction {
+					padding: 2px 6px;
+					border-radius: 12px;
+					background-color: #333;
+					font-size: 0.9em;
+					cursor: pointer;
+					transition: all 0.2s;
+					display: flex;
+					align-items: center;
+					gap: 4px;
+				}
+
+				.reaction:hover {
+					background-color: #444;
+					transform: scale(1.1);
+				}
+
+				.reaction-count {
+					font-size: 0.8em;
+					color: #888;
+				}
+
+				#input-container {
+					display: flex;
+					gap: 8px;
+					padding: 0 10px;
+				}
+
+				#messageInput {
+					flex: 1;
+					padding: 10px 14px;
+					border-radius: 20px;
+					border: 1px solid var(--border-color);
+					background-color: var(--input-bg);
+					color: var(--font-color);
+					font-size: 14px;
+					transition: border-color 0.2s;
+				}
+
+				#messageInput:focus {
+					outline: none;
+					border-color: #0e639c;
+				}
+
+				button {
+					padding: 8px 20px;
+					background-color: var(--button-bg);
+					color: white;
+					border: none;
+					border-radius: 20px;
+					cursor: pointer;
+					font-weight: 500;
+					transition: all 0.2s;
+				}
+
+				button:hover {
+					background-color: var(--button-hover);
+					transform: translateY(-1px);
+				}
+
+				button:active {
+					transform: translateY(1px);
+				}
+			</style>
+		</head>
+		<body>
+			<div id="header">
+				<h3>Live Chat 💬</h3>
+				<div id="status">Connecting...</div>
+			</div>
+			<div id="chat"></div>
+			<div id="notification-container" class="notification-container"></div>
+			<div id="input-container">
+				<input type="text" id="messageInput" placeholder="Type your message..." />
+				<button onclick="sendMessage()">Send</button>
+			</div>
+
+			<script>
+				const vscode = acquireVsCodeApi();
+				const chat = document.getElementById('chat');
+				const messageInput = document.getElementById('messageInput');
+				const status = document.getElementById('status');
+				const notificationContainer = document.getElementById('notification-container');
+				let username = '';
+				let messages = [];
+
+				const state = vscode.getState() || { messages: [] };
+				messages = state.messages;
+				messages.forEach(msg => addMessageToUI(msg));
+
+				function showNotification(text) {
+					const notification = document.createElement('div');
+					notification.className = 'notification';
+					notification.textContent = text;
+					notificationContainer.appendChild(notification);
+
+					setTimeout(() => {
+						notification.remove();
+					}, 3000);
+				}
+
+				window.addEventListener('message', event => {
+					const message = event.data;
+					console.log('Received message:', message);
+
+					switch (message.type) {
+						case 'setUsername':
+							username = message.username;
+							status.textContent = 'Connected as ' + username;
+							break;
+						case 'chatMessage':
+							const msg = {
+								id: Date.now().toString(),
+								username: message.username,
+								text: message.text,
+								time: message.time,
+								reactions: {}
+							};
+							messages.push(msg);
+							vscode.setState({ messages });
+							addMessageToUI(msg);
+							break;
+						case 'reaction':
+							handleReaction(message);
+							showNotification(\`\${message.username} reacted with \${message.reaction}\`);
+							break;
+					}
+				});
+
+				function handleReaction(data) {
+					const messageElement = document.querySelector(\`[data-message-id="\${data.messageId}"]\`);
+					if (messageElement) {
+						const reactionsContainer = messageElement.querySelector('.reactions');
+						const reaction = reactionsContainer.querySelector(\`[data-reaction="\${data.reaction}"]\`);
+						
+						const message = messages.find(m => m.id === data.messageId);
+						if (message) {
+							if (!message.reactions[data.reaction]) {
+								message.reactions[data.reaction] = new Set();
+							}
+							message.reactions[data.reaction].add(data.username);
+							
+							if (reaction) {
+								const count = message.reactions[data.reaction].size;
+								reaction.querySelector('.reaction-count').textContent = count;
+							} else {
+								const newReaction = createReactionElement(data.reaction, message.reactions[data.reaction].size);
+								reactionsContainer.appendChild(newReaction);
+							}
+							
+							vscode.setState({ messages });
+						}
+					}
+				}
+
+				function createReactionElement(emoji, count) {
+					const span = document.createElement('span');
+					span.className = 'reaction';
+					span.setAttribute('data-reaction', emoji);
+					span.innerHTML = \`\${emoji}<span class="reaction-count">\${count}</span>\`;
+					return span;
+				}
+
+				function sendReaction(messageId, reaction) {
+					vscode.postMessage({
+						type: 'reaction',
+						messageId: messageId,
+						reaction: reaction
+					});
+				}
+
+				function addMessageToUI(msg) {
+					const div = document.createElement('div');
+					div.className = 'message ' + (msg.username === username ? 'user' : 'other');
+					div.setAttribute('data-message-id', msg.id);
+					
+					let reactionsHtml = '';
+					if (msg.reactions) {
+						reactionsHtml = Object.entries(msg.reactions)
+							.map(([emoji, users]) => \`
+								<span class="reaction" data-reaction="\${emoji}" onclick="sendReaction('\${msg.id}', '\${emoji}')">
+									\${emoji}<span class="reaction-count">\${users.size}</span>
+								</span>
+							\`).join('');
+					}
+
+					div.innerHTML = \`
+						<div class="bubble">
+							<div class="bubble-header">
+								<span class="bubble-user">\${msg.username}</span>
+								<span class="bubble-time">\${msg.time}</span>
+							</div>
+							<div class="bubble-text">\${msg.text}</div>
+							<div class="reactions">
+								\${reactionsHtml}
+								<span class="reaction" onclick="sendReaction('\${msg.id}', '👍')">👍</span>
+								<span class="reaction" onclick="sendReaction('\${msg.id}', '❤️')">❤️</span>
+								<span class="reaction" onclick="sendReaction('\${msg.id}', '😊')">😊</span>
+							</div>
+						</div>
+					\`;
+					chat.appendChild(div);
+					chat.scrollTop = chat.scrollHeight;
+				}
+
+				function sendMessage() {
+					const text = messageInput.value.trim();
+					if (text) {
+						vscode.postMessage({
+							type: 'chatMessage',
+							text: text
+						});
+						messageInput.value = '';
+					}
+				}
+
+				messageInput.addEventListener('keypress', (e) => {
+					if (e.key === 'Enter') {
+						sendMessage();
+					}
+				});
+
+				vscode.postMessage({ type: 'ready' });
+			</script>
+		</body>
+		</html>
+		`;
+
+		panel.webview.onDidReceiveMessage(async (msg) => {
+			switch (msg.type) {
+				case 'ready':
 				panel.webview.postMessage({
 					type: 'setUsername',
 					username: collaborativeEditor.username
 				});
+					break;
+				case 'chatMessage':
+					if (collaborativeEditor.ws && collaborativeEditor.ws.readyState === WebSocket.OPEN) {
+						const chatMessage = {
+							type: 'chat',
+							text: msg.text,
+							username: collaborativeEditor.username,
+							timestamp: new Date().toISOString()
+						};
+						collaborativeEditor.ws.send(JSON.stringify(chatMessage));
+						
+						panel.webview.postMessage({
+							type: 'chatMessage',
+							username: collaborativeEditor.username,
+							text: msg.text,
+							time: new Date().toLocaleTimeString()
+						});
+					} else {
+						vscode.window.showErrorMessage('Not connected to chat server');
+					}
+					break;
+				case 'reaction':
+					collaborativeEditor.sendReaction(msg.messageId, msg.reaction);
+					break;
 			}
 		});
+
+		if (collaborativeEditor.ws) {
+			collaborativeEditor.ws.onmessage = (event) => {
+				try {
+					const message = JSON.parse(event.data);
+					if (message.type === 'chat') {
+						panel.webview.postMessage({
+							type: 'chatMessage',
+							username: message.username,
+							text: message.text,
+							time: new Date(message.timestamp).toLocaleTimeString()
+						});
+					} else if (message.type === 'reaction') {
+						panel.webview.postMessage({
+							type: 'reaction',
+							messageId: message.messageId,
+							reaction: message.reaction,
+							username: message.username
+						});
+					}
+				} catch (error) {
+					console.error('Error handling chat message:', error);
+				}
+			};
+		}
 	});
 
 	const connectCommand = vscode.commands.registerCommand('collab-code.connect', async function () {
@@ -61,14 +500,31 @@ function activate(context) {
 		}
 	});
 
-	const startServerCommand = vscode.commands.registerCommand('collab-code.startServer', function () {
+	const startServerCommand = vscode.commands.registerCommand('collab-code.startServer', async function () {
 		const terminal = vscode.window.createTerminal('CollabCode Server');
+		
+		if (process.platform === 'win32') {
+			terminal.sendText('FOR /F "tokens=5" %P IN (\'netstat -ano ^| findstr :8080\') DO TaskKill /PID %P /F >nul 2>&1');
+		} else {
+			terminal.sendText('lsof -ti:8080 | xargs kill -9');
+		}
+
+		await new Promise(resolve => setTimeout(resolve, 1000));
+
 		terminal.sendText('node server.js');
 		terminal.show();
 		
 		const ip = require('ip');
 		const localIP = ip.address();
-		vscode.window.showInformationMessage(`Server started. Share this address with collaborators: ws://${localIP}:8080`);
+		const serverUrl = `ws://${localIP}:8080`;
+		
+		await vscode.workspace.getConfiguration('collab-code').update('serverUrl', serverUrl, true);
+		
+		vscode.window.showInformationMessage(
+			`Server started!\n` +
+			`Share this address with your collaborators: ${serverUrl}\n` +
+			`They can connect using the "CollabCode: Connect to Server" command.`
+		);
 	});
 
 	const notesCommand = vscode.commands.registerCommand('collab-code.openNotes', async function () {
@@ -112,6 +568,45 @@ function getWebviewContent() {
 					--input-bg: #3c3c3c;
 				}
 
+				.notification-container {
+					position: fixed;
+					bottom: 80px;
+					right: 20px;
+					z-index: 1000;
+				}
+
+				.notification {
+					background-color: rgba(30, 30, 30, 0.9);
+					color: #d4d4d4;
+					padding: 8px 12px;
+					border-radius: 6px;
+					margin-top: 8px;
+					font-size: 12px;
+					animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s;
+					border: 1px solid var(--border-color);
+					box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+				}
+
+				@keyframes slideIn {
+					from {
+						transform: translateX(100%);
+						opacity: 0;
+					}
+					to {
+						transform: translateX(0);
+						opacity: 1;
+					}
+				}
+
+				@keyframes fadeOut {
+					from {
+						opacity: 1;
+					}
+					to {
+						opacity: 0;
+					}
+				}
+
 				body {
 					margin: 0;
 					padding: 16px;
@@ -120,9 +615,21 @@ function getWebviewContent() {
 					color: var(--font-color);
 				}
 
+				#header {
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					margin-bottom: 16px;
+				}
+
 				h3 {
-					margin-bottom: 12px;
+					margin: 0;
 					color: #3794ff;
+				}
+
+				#status {
+					font-size: 0.9em;
+					color: #888;
 				}
 
 				#chat {
@@ -136,11 +643,28 @@ function getWebviewContent() {
 					margin-bottom: 14px;
 				}
 
+				.message {
+					margin-bottom: 12px;
+					opacity: 0;
+					transform: translateY(20px);
+					animation: slideIn 0.3s ease forwards;
+				}
+
+				@keyframes slideIn {
+					to {
+						opacity: 1;
+						transform: translateY(0);
+					}
+				}
+
 				.message.user {
 					display: flex;
 					justify-content: flex-end;
-					padding-right: 12px;
-					margin-bottom: 12px;
+				}
+
+				.message.other {
+					display: flex;
+					justify-content: flex-start;
 				}
 
 				.bubble {
@@ -151,231 +675,165 @@ function getWebviewContent() {
 					box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 				}
 
+				.message.user .bubble {
+					background-color: #0e639c;
+				}
+
 				.bubble-header {
 					display: flex;
 					justify-content: space-between;
 					align-items: center;
 					margin-bottom: 4px;
-					color: #d4d4d4;
 					font-size: 0.85em;
 				}
 
 				.bubble-user {
 					font-weight: bold;
+					color: #3794ff;
+				}
+
+				.message.user .bubble-user {
+					color: #fff;
 				}
 
 				.bubble-time {
 					font-size: 0.75em;
-					color: gray;
-					margin-left: 10px;
+					color: #666;
 				}
 
 				.bubble-text {
-					font-size: 1em;
-					margin-bottom: 6px;
 					word-wrap: break-word;
-					text-align: left;
+					line-height: 1.4;
 				}
 
-				.reactions {
+				#input-container {
 					display: flex;
-					justify-content: flex-end;
-					gap: 10px;
-					margin-top: 6px;
+					gap: 8px;
 				}
 
-				.reaction {
-					cursor: pointer;
-					font-size: 18px;
-					user-select: none;
-					padding: 4px 6px;
-					border-radius: 5px;
-					transition: transform 0.1s, background-color 0.2s;
-				}
-
-				.reaction:hover {
-					transform: scale(1.2);
-					background-color: #444;
-				}
-
-				input {
-					width: 78%;
-					padding: 8px;
+				#messageInput {
+					flex: 1;
+					padding: 8px 12px;
 					border-radius: 6px;
 					border: 1px solid var(--border-color);
 					background-color: var(--input-bg);
-					color: white;
-					outline: none;
-				}
-
-				input::placeholder {
-					color: #888;
+					color: var(--font-color);
+					font-size: 14px;
 				}
 
 				button {
-					width: 20%;
-					margin-left: 2%;
-					padding: 8px;
+					padding: 8px 16px;
 					background-color: var(--button-bg);
 					color: white;
 					border: none;
 					border-radius: 6px;
 					cursor: pointer;
 					font-weight: 500;
+					transition: background-color 0.2s;
 				}
 
 				button:hover {
 					background-color: var(--button-hover);
 				}
 
-				#input-row {
-					display: flex;
-					justify-content: space-between;
-					align-items: center;
+				button:active {
+					transform: translateY(1px);
 				}
-				.date-divider {
-  					text-align: center;
-  					color: #999;
-  					margin: 16px 0 8px;
-  					font-size: 0.85em;
-  					border-top: 1px solid #444;
-  					padding-top: 6px;
-				}
-
 			</style>
+		</head>
+		<body>
+			<div id="header">
+				<h3>Live Chat 💬</h3>
+				<div id="status">Connecting...</div>
+			</div>
+			<div id="chat"></div>
+			<div id="notification-container" class="notification-container"></div>
+			<div id="input-container">
+				<input type="text" id="messageInput" placeholder="Type your message..." />
+				<button onclick="sendMessage()">Send</button>
+			</div>
 
-			<script type="module">
-				import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-				import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+			<script>
+				const vscode = acquireVsCodeApi();
+				const chat = document.getElementById('chat');
+				const messageInput = document.getElementById('messageInput');
+				const status = document.getElementById('status');
+				const notificationContainer = document.getElementById('notification-container');
+				let username = '';
 
-				const firebaseConfig = {
-					apiKey: "AIzaSyBysdPKO20O9NaAuqvr9XXXB2uBIqAFGxI",
-					authDomain: "collabcode-chat.firebaseapp.com",
-					databaseURL: "https://collabcode-chat-default-rtdb.firebaseio.com/",
-					projectId: "collabcode-chat",
-					storageBucket: "collabcode-chat.appspot.com",
-					messagingSenderId: "822599985818",
-					appId: "1:822599985818:web:36b865cb2f158809d4cd23"
+				console.log = function(...args) {
+					vscode.postMessage({
+						type: 'log',
+						message: args.join(' ')
+					});
 				};
-
-				const app = initializeApp(firebaseConfig);
-				const database = getDatabase(app);
-				const chatRef = ref(database, 'messages');
-
-				let currentUsername = "Anonymous"; // default
 
 				window.addEventListener('message', event => {
 				const message = event.data;
-				if (message.type === 'setUsername') {
-					currentUsername = message.username || "Anonymous";
-				}
-			});
-			
-			// Notify extension that webview is ready
-				window.addEventListener('load', () => {
-				const vscode = acquireVsCodeApi();
-				vscode.postMessage({ type: 'ready' });
-			});
+					console.log('Received message:', message);
 
-
-				window.sendMessage = function() {
-					const input = document.getElementById('message');
-					if (input.value.trim() !== '') {
-						push(chatRef, {
-							type: "chat",
-							user: currentUsername,
-							text: input.value,
-							timestamp: new Date().toISOString()
-						});
-						input.value = '';
+					switch (message.type) {
+						case 'setUsername':
+							username = message.username;
+							status.textContent = 'Connected as ' + username;
+							break;
+						case 'chatMessage':
+							addMessage(message.username, message.text, message.time);
+							break;
 					}
-				};
-				
+				});
 
-				import { remove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
-				remove(chatRef);
+				function showNotification(text) {
+					const notification = document.createElement('div');
+					notification.className = 'notification';
+					notification.textContent = text;
+					notificationContainer.appendChild(notification);
 
-				onValue(chatRef, (snapshot) => {
-					const chat = document.getElementById('chat');
-					chat.innerHTML = '';
-					const data = snapshot.val();
-					for (let id in data) {
-						const message = data[id];
+					setTimeout(() => {
+						notification.remove();
+					}, 3000);
+				}
 
-						const msgDate = new Date(message.timestamp);
-						const time = new Date(message.timestamp).toLocaleTimeString([], { 
-							hour: '2-digit', 
-							minute: '2-digit'
+				function sendMessage() {
+					const text = messageInput.value.trim();
+					if (text) {
+						console.log('Sending message:', text);
+						vscode.postMessage({
+							type: 'chatMessage',
+							text: text
 						});
-				
+						messageInput.value = '';
+					}
+				}
 
-						let messageHTML = '';
-							
-						if (message.type === "reaction") {
-							const reactionHTML = \`
-								<div class="message user">
+				function addMessage(user, text, time) {
+					console.log('Adding message:', { user, text, time });
+					const div = document.createElement('div');
+					div.className = 'message ' + (user === username ? 'user' : 'other');
+					div.innerHTML = \`
 									<div class="bubble">
 										<div class="bubble-header">
-											<span class="bubble-user">\${message.user}</span>
-											<span class="bubble-time">${time}</span>
-										</div>
-										<div class="bubble-text">reacted with \${message.emoji}</div>
-									</div>
-								</div>
-							\`;
-							chat.innerHTML += reactionHTML;
-						} else if (message.type === "chat") {
-							const messageHTML = \`
-								<div class="message user">
-									<div class="bubble">
-										<div class="bubble-header">
-											<span class="bubble-user">\${message.user}</span>
+								<span class="bubble-user">\${user}</span>
 											<span class="bubble-time">\${time}</span>
 										</div>
-										<div class="bubble-text">\${message.text}</div>
-										<div class="reactions">
-											<span class="reaction">👍</span>
-											<span class="reaction">❤️</span>
-											<span class="reaction">😂</span>
-										</div>
-									</div>
+							<div class="bubble-text">\${text}</div>
 								</div>
 							\`;
-							chat.innerHTML += messageHTML;
-						}
-					}
+					chat.appendChild(div);
 					chat.scrollTop = chat.scrollHeight;
-				});
+				}
 
-				document.addEventListener('click', function (e) {
-					if (e.target.classList.contains('reaction')) {
-						const reactionEmoji = e.target.textContent;
-						push(chatRef, {
-							type: "reaction",
-							user: currentUsername,
-							emoji: reactionEmoji,
-							timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-						});
+				messageInput.addEventListener('keypress', (e) => {
+					if (e.key === 'Enter') {
+						sendMessage();
 					}
 				});
 
+				console.log('Webview ready, sending ready message');
+				vscode.postMessage({ type: 'ready' });
 			</script>
-
-		</head>
-		<body>
-    		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        		<h3 style="margin: 0;">Live Chat 💬</h3>
-    		</div>
-
-    		<div id="chat"></div>
-
-    		<div id="input-row">
-        		<input id="message" placeholder="Say something..." />
-        		<button onclick="sendMessage()">Send</button>
-    		</div>
 		</body>
 		</html>
-
 	`;
 }
 
@@ -429,7 +887,6 @@ function getNotesWebviewContent() {
 
 			const textarea = document.getElementById('notes');
 
-			// Sync updates
 			onValue(notesRef, (snapshot) => {
 				const val = snapshot.val();
 				if (val !== null && val !== textarea.value) {
