@@ -2,12 +2,17 @@ const WebSocket = require('ws');
 const http = require('http');
 const ip = require('ip');
 
-const server = http.createServer();
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('WebSocket server is running');
+});
+
 const wss = new WebSocket.Server({ 
-    server,
+    noServer: true,
     perMessageDeflate: false,
     clientTracking: true
 });
+
 const clients = new Map();
 
 const HEARTBEAT_INTERVAL = 30000;
@@ -26,6 +31,12 @@ const interval = setInterval(() => {
         }
     });
 }, HEARTBEAT_INTERVAL);
+
+server.on('upgrade', (request, socket, head) => {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+    });
+});
 
 wss.on('connection', (ws, req) => {
     const clientId = Math.random().toString(36).substr(2, 9);
