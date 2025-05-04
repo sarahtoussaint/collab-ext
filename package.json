@@ -11,7 +11,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:collab-code.helloWorld",
+    "onCommand:collab-code.openChat",
     "onCommand:collab-code.connect",
     "onCommand:collab-code.startServer",
     "onCommand:collab-code.openNotes"
@@ -20,7 +20,7 @@
   "contributes": {
     "commands": [
       {
-        "command": "collab-code.helloWorld",
+        "command": "collab-code.openChat",
         "title": "CollabCode: Open Live Chat"
       },
       {

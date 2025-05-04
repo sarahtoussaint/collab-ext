@@ -10,7 +10,7 @@ let collaborativeEditor;
 function activate(context) {
 	console.log('Congratulations, your extension "collab-code" is now active!');
 
-	const chatCommand = vscode.commands.registerCommand('collab-code.helloWorld', async function () {
+	const chatCommand = vscode.commands.registerCommand('collab-code.openChat', async function () {
 		if (!collaborativeEditor) {
 			collaborativeEditor = new CollaborativeEditor();
 		}
@@ -30,11 +30,16 @@ function activate(context) {
 				enableScripts: true
 			}
 		);
-
+		
 		panel.webview.html = getWebviewContent();
-		panel.webview.postMessage({
-			type: 'setUsername',
-			username: collaborativeEditor.username
+
+		panel.webview.onDidReceiveMessage((msg) => {
+			if (msg.type === 'ready') {
+				panel.webview.postMessage({
+					type: 'setUsername',
+					username: collaborativeEditor.username
+				});
+			}
 		});
 	});
 
@@ -265,6 +270,13 @@ function getWebviewContent() {
 					currentUsername = message.username || "Anonymous";
 				}
 			});
+			
+			// Notify extension that webview is ready
+				window.addEventListener('load', () => {
+				const vscode = acquireVsCodeApi();
+				vscode.postMessage({ type: 'ready' });
+			});
+
 
 				window.sendMessage = function() {
 					const input = document.getElementById('message');

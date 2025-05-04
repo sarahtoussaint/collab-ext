@@ -13,6 +13,21 @@ class CollaborativeEditor {
         this.cursorDecorations = new Map();
         this.activeUsers = new Map();
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+        this.userColors = new Map();
+        this.assignedColors = new Set();
+
+        this.colorPool = [
+            "#FF5733", // orange-red
+            "#33FF57", // lime green
+            "#40E0D0", // turquoise
+            "#FF33A8", // hot pink
+            "#FFD133", // yellow
+            "#33FFF0", // aqua
+            "#FF8F33", // orange
+            "#C733FF", // purple
+            "#33FF95", // mint
+            "#FF3333"  // red
+        ];
         this.suppressBroadcast = false;
         console.log('CollaborativeEditor: Constructor called');
     }
@@ -115,25 +130,40 @@ class CollaborativeEditor {
         });
     }
 
+    getUserColor(usernameOrId) {
+        if (!this.userColors.has(usernameOrId)) {
+            const availableColors = this.colorPool.filter(c => !this.assignedColors.has(c));
+            const color = availableColors.length > 0
+                ? availableColors[Math.floor(Math.random() * availableColors.length)]
+                : "#FFFFFF";
+    
+            this.userColors.set(usernameOrId, color);
+            this.assignedColors.add(color);
+        }
+        return this.userColors.get(usernameOrId);
+    }
+    
     showLocalCursor(position) {
         if (!this.editor) return;
-
+    
+        const color = this.getUserColor(this.clientId);
+    
         const decorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: 'rgba(0, 255, 0, 0.2)',
-            border: '2px solid green',
+            backgroundColor: `${color}33`, // 20% transparent
+            border: `2px solid ${color}`,
             after: {
                 contentText: ` 👤 ${this.username} (you)`,
-                color: '#00FF00',
+                color: color,
                 margin: '0 0 0 20px',
                 fontWeight: 'bold'
             },
             isWholeLine: true
         });
-
+    
         if (this.cursorDecorations.has('local')) {
             this.cursorDecorations.get('local').dispose();
         }
-
+    
         this.editor.setDecorations(decorationType, [new vscode.Range(position, position)]);
         this.cursorDecorations.set('local', decorationType);
     }
@@ -215,26 +245,27 @@ class CollaborativeEditor {
 
     showRemoteCursor(data) {
         if (!this.editor) return;
-
+    
         const position = new vscode.Position(data.position.line, data.position.character);
         const username = data.username || `User${data.senderId.substr(0, 4)}`;
-
+        const color = this.getUserColor(data.senderId);
+    
         const decorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: 'rgba(255, 0, 0, 0.2)',
-            border: '2px solid red',
+            backgroundColor: `${color}33`,
+            border: `2px solid ${color}`,
             after: {
                 contentText: ` 👤 ${username}`,
-                color: '#FF0000',
+                color: color,
                 margin: '0 0 0 20px',
                 fontWeight: 'bold'
             },
             isWholeLine: true
         });
-
+    
         if (this.cursorDecorations.has(data.senderId)) {
             this.cursorDecorations.get(data.senderId).dispose();
         }
-
+    
         this.editor.setDecorations(decorationType, [new vscode.Range(position, position)]);
         this.cursorDecorations.set(data.senderId, decorationType);
     }
