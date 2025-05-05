@@ -304,11 +304,9 @@ class CollaborativeEditor {
             isWholeLine: true
           });
     
-        if (this.cursorDecorations.has(data.senderId)) {
-            this.cursorDecorations.get(data.senderId).dispose();
-        }
-    
-        this.cursorDecorations.get(data.senderId)?.dispose();
+        
+        this.cursorDecorations.get(data.senderId).dispose();
+        
         editor.setDecorations(decorationType, [ new vscode.Range(position, position) ]);
         this.cursorDecorations.set(data.senderId, decorationType);
     }
