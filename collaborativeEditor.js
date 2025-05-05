@@ -281,29 +281,35 @@ class CollaborativeEditor {
     }
 
     showRemoteCursor(data) {
-        if (!this.editor) return;
+        const editor = vscode.window.visibleTextEditors.find(ed =>
+            ed.document.uri.toString() === this.document.uri.toString()
+          );
+
+        if (!editor) {
+            console.warn('No matching editor found for remote cursor');
+            return;
+        }
     
         const position = new vscode.Position(data.position.line, data.position.character);
         const username = data.username || `User${data.senderId.substr(0, 4)}`;
-        const color = this.getUserColor(data.senderId);
+        const color    = this.getUserColor(data.senderId);
     
         const decorationType = vscode.window.createTextEditorDecorationType({
             backgroundColor: `${color}33`,
-            border: `2px solid ${color}`,
+            border:           `2px solid ${color}`,
             after: {
-                contentText: ` 👤 ${username}`,
-                color: color,
-                margin: '0 0 0 20px',
-                fontWeight: 'bold'
+              contentText: ` 👤 ${username}`,
+              color, margin: '0 0 0 20px', fontWeight: 'bold'
             },
             isWholeLine: true
-        });
+          });
     
         if (this.cursorDecorations.has(data.senderId)) {
             this.cursorDecorations.get(data.senderId).dispose();
         }
     
-        this.editor.setDecorations(decorationType, [new vscode.Range(position, position)]);
+        this.cursorDecorations.get(data.senderId)?.dispose();
+        editor.setDecorations(decorationType, [ new vscode.Range(position, position) ]);
         this.cursorDecorations.set(data.senderId, decorationType);
     }
 
