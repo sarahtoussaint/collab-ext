@@ -25,7 +25,7 @@ Keep track of ideas, tasks, and important information in a shared notepad that's
 
 ```bash
 git clone https://github.com/your-username/CollabCode.git
-```bash
+```
 
 ### 2. **Open in Visual Studio Code**
 Navigate to the folder and open it with VS Code.
@@ -52,4 +52,5 @@ From the Command Palette, you can also:
 CollabCode: Open Live Chat
 
 CollabCode: Open Shared Notes
----
+
+##
