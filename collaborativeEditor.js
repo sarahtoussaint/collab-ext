@@ -96,26 +96,31 @@ class CollaborativeEditor {
     }
 
     setupEditorListeners() {
-        console.log('CollaborativeEditor: Setting up editor listeners');
-
         vscode.window.onDidChangeActiveTextEditor(editor => {
-            console.log('CollaborativeEditor: Active editor changed');
-            this.editor = editor;
-            if (editor) {
-                this.document = editor.document;
-                this.registerCursorTracking(editor);
-                vscode.window.showInformationMessage(`CollabCode: Collaboration mode activated as ${this.username}!`);
-                this.updateStatusBar('Connected');
-            }
+          // Ignore panels/webviews: only track file-system editors
+          if (!editor || editor.document.uri.scheme !== 'file') {
+            return;
+          }
+          this.editor   = editor;
+          this.document = editor.document;    // now always points at your code file
+          this.fileUri  = editor.document.uri; // stash the URI for matching later
+          this.registerCursorTracking(editor);
+      
+          vscode.window.showInformationMessage(
+            `CollabCode: Collaboration activated as ${this.username}`
+          );
+          this.updateStatusBar('Connected');
         });
-
-        this.editor = vscode.window.activeTextEditor;
-        if (this.editor) {
-            console.log('CollaborativeEditor: Initializing current editor');
-            this.document = this.editor.document;
-            this.registerCursorTracking(this.editor);
+      
+        // Initialize if you already had a file open on activation
+        const init = vscode.window.activeTextEditor;
+        if (init && init.document.uri.scheme === 'file') {
+          this.editor   = init;
+          this.document = init.document;
+          this.fileUri  = init.document.uri;
+          this.registerCursorTracking(init);
         }
-    }
+      }
 
     registerCursorTracking(editor) {
         console.log('CollaborativeEditor: Registering cursor tracking');
@@ -281,35 +286,46 @@ class CollaborativeEditor {
     }
 
     showRemoteCursor(data) {
+        // 1) Find the code‐file editor by matching fsPath
         const editor = vscode.window.visibleTextEditors.find(ed =>
-            ed.document.uri.toString() === this.document.uri.toString()
-          );
-
+          ed.document.uri.fsPath === this.fileUri.fsPath
+        );
         if (!editor) {
-            console.warn('No matching editor found for remote cursor');
-            return;
+          console.warn('No matching editor for remote cursor; looking for:', this.fileUri.fsPath);
+          vscode.window.visibleTextEditors.forEach(ed =>
+            console.log(' • visible:', ed.document.uri.fsPath)
+          );
+          return;
         }
-    
-        const position = new vscode.Position(data.position.line, data.position.character);
-        const username = data.username || `User${data.senderId.substr(0, 4)}`;
+      
+        // 2) Build the decoration
+        const pos      = new vscode.Position(data.position.line, data.position.character);
+        const who      = data.username || `User${data.senderId.substr(0,4)}`;
         const color    = this.getUserColor(data.senderId);
-    
-        const decorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: `${color}33`,
-            border:           `2px solid ${color}`,
-            after: {
-              contentText: ` 👤 ${username}`,
-              color, margin: '0 0 0 20px', fontWeight: 'bold'
-            },
-            isWholeLine: true
-          });
-    
-        
-        this.cursorDecorations.get(data.senderId).dispose();
-        
-        editor.setDecorations(decorationType, [ new vscode.Range(position, position) ]);
-        this.cursorDecorations.set(data.senderId, decorationType);
-    }
+        const decoType = vscode.window.createTextEditorDecorationType({
+          backgroundColor: `${color}33`,
+          border:           `2px solid ${color}`,
+          after: {
+            contentText: ` 👤 ${who}`,
+            color,
+            margin: '0 0 0 20px',
+            fontWeight: 'bold'
+          },
+          isWholeLine: true
+        });
+      
+        // 3) Dispose any previous decoration for that user
+        const old = this.cursorDecorations.get(data.senderId);
+        if (old) {
+          old.dispose();
+        }
+      
+        // 4) Apply to the correct editor
+        editor.setDecorations(decoType, [ new vscode.Range(pos, pos) ]);
+        this.cursorDecorations.set(data.senderId, decoType);
+      
+        console.log(`Painted remote cursor for ${who} at ${pos.line}:${pos.character}`);
+      }
 
     removeUserCursor(senderId) {
         const decoration = this.cursorDecorations.get(senderId);
