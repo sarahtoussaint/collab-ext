@@ -131,7 +131,8 @@ class CollaborativeEditor {
                             line: position.line,
                             character: position.character
                         },
-                        username: this.username
+                        username: this.username,
+                        senderId: this.clientId
                     }));
                 }
             }

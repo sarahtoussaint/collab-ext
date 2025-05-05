@@ -544,7 +544,7 @@ function activate(context) {
 	vscode.window.onDidChangeTextEditorSelection(event => {
 		if (collaborativeEditor && event.textEditor === vscode.window.activeTextEditor) {
 			const position = event.selections[0].active;
-			collaborativeEditor.sendCursorPosition(position);
+			collaborativeEditor.showLocalCursor(position);
 		}
 	});
 
