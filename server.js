@@ -16,7 +16,7 @@ const wss = new WebSocket.Server({
 const clients = new Map();
 
 const HEARTBEAT_INTERVAL = 30000;
-const HEARTBEAT_TIMEOUT = 10000;
+const HEARTBEAT_TIMEOUT = 30000;
 
 const interval = setInterval(() => {
     wss.clients.forEach((ws) => {
