@@ -171,5 +171,16 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`WebSocket server running at:`);
     console.log(`- Local address: ws://localhost:${PORT}`);
     console.log(`- LAN address: ws://${lanIP}:${PORT}`);
-    console.log('Share the LAN address with your collaborators!');
+    console.log(`- All available network interfaces:`);
+    
+    const networkInterfaces = require('os').networkInterfaces();
+    Object.keys(networkInterfaces).forEach((interfaceName) => {
+        networkInterfaces[interfaceName].forEach((interface) => {
+            if (interface.family === 'IPv4' && !interface.internal) {
+                console.log(`  - ws://${interface.address}:${PORT}`);
+            }
+        });
+    });
+    
+    console.log('Share any of these addresses with your collaborators!');
 });
