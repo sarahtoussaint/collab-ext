@@ -17,38 +17,6 @@ Integrated chat lets you communicate with your collaborators without ever leavin
 ### 3. **Shared Notes**
 Keep track of ideas, tasks, and important information in a shared notepad that's always accessible during your session.
 
----
-
-## How to Use
-
-### 1. **Clone the Repository**
-
-```bash
-git clone https://github.com/your-username/CollabCode.git
-```
-
-### 2. **Open in Visual Studio Code**
-Navigate to the folder and open it with VS Code.
-
-### 3. ***Run the Extension***
-In VS Code:
-
-Open the Command Palette (Ctrl+Shift+P or Cmd+Shift+P)
-
-Search for and run: CollabCode: Launch Extension
-
-### 4. ***Start or Connect to a Server***
-In the Command Palette:
-
-Choose CollabCode: Start Server to host a new session
-
-Choose CollabCode: Connect to Server to join an existing session
-
-Enter your name and you’re ready to start coding together!
-
-### 5. ***Accessing Other Features***
-From the Command Palette, you can also:
-
 CollabCode: Open Live Chat
 
 CollabCode: Open Shared Notes
